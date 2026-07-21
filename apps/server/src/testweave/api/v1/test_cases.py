@@ -148,6 +148,7 @@ class TestCaseMindmapSaveRequest(BaseModel):
 
 # ==============================================================================
 
+
 # API Endpoints
 # ==============================================================================
 @router.post("/test-cases", response_model=TestCaseResponse)
@@ -235,9 +236,7 @@ def get_case_detail(
         raise AppError(code="TEST_CASE_NOT_FOUND", message="测试用例不存在", status_code=404)
 
     steps_stmt = (
-        select(TestCaseStep)
-        .where(TestCaseStep.case_id == caseId)
-        .order_by(TestCaseStep.step_order)
+        select(TestCaseStep).where(TestCaseStep.case_id == caseId).order_by(TestCaseStep.step_order)
     )
     steps = db.scalars(steps_stmt).all()
 
@@ -261,7 +260,12 @@ def start_edit_session(
     _: None = Depends(require_project_permission(VERSION_MANAGE)),
 ) -> TestCaseEditSessionResponse:
     """开启或进入用例编辑会话"""
-    session = TestCaseService.start_edit_session(db, case_id=str(caseId), actor_id=str(user.id))
+    session = TestCaseService.start_edit_session(
+        db,
+        project_id=str(projectId),
+        case_id=str(caseId),
+        actor_id=str(user.id),
+    )
     db.commit()
     return TestCaseEditSessionResponse.model_validate(session)
 
@@ -282,6 +286,8 @@ def update_session_draft(
     """更新草稿与暂存编辑状态"""
     session = TestCaseService.update_session_draft(
         db,
+        project_id=str(projectId),
+        case_id=str(caseId),
         session_id=str(sessionId),
         dirty_fields=payload.dirtyFields,
         actor_id=str(user.id),
@@ -306,6 +312,8 @@ def finalize_edit_session(
     """提交会话发布，生成新修订快照"""
     revision = TestCaseService.finalize_edit_session(
         db,
+        project_id=str(projectId),
+        case_id=str(caseId),
         session_id=str(sessionId),
         actor_id=str(user.id),
         change_summary=payload.changeSummary,
@@ -329,6 +337,8 @@ def abandon_edit_session(
     """放弃编辑会话"""
     session = TestCaseService.abandon_edit_session(
         db,
+        project_id=str(projectId),
+        case_id=str(caseId),
         session_id=str(sessionId),
         actor_id=str(user.id),
     )
@@ -345,6 +355,14 @@ def get_case_revisions(
     _: None = Depends(require_project_permission(VERSION_READ)),
 ) -> list[TestCaseRevisionResponse]:
     """查询用例的版本修订历史列表"""
+    case_stmt = select(TestCase.id).where(
+        TestCase.id == caseId,
+        TestCase.project_id == projectId,
+        TestCase.deleted_at.is_(None),
+    )
+    if db.scalar(case_stmt) is None:
+        raise AppError(code="TEST_CASE_NOT_FOUND", message="测试用例不存在", status_code=404)
+
     stmt = (
         select(TestCaseRevision)
         .where(TestCaseRevision.case_id == caseId)
@@ -411,4 +429,3 @@ def sync_mindmap_to_cases(
     )
     db.commit()
     return {"status": "SUCCESS", "syncedCount": count}
-

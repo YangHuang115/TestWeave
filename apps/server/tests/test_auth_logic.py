@@ -1,14 +1,22 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
+from testweave.api.dependencies.database import get_db
+from testweave.core.config import Settings, get_settings
+from testweave.core.readiness import NotConfiguredReadinessProbe
 from testweave.core.security import (
     hash_password,
     hash_session_token,
     verify_password,
 )
+from testweave.db.base import Base
 from testweave.db.models import UserSession
+from testweave.main import create_app
 from testweave.modules.auth.service import (
     AuthService,
 )
@@ -150,3 +158,63 @@ def test_session_idle_timeout(db: Session) -> None:
     db.commit()
 
     assert AuthService.get_user_by_session_token(db, token) is None
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("environment", "expected_secure"),
+    [("development", False), ("test", False), ("production", True)],
+)
+async def test_auth_cookies_follow_environment_secure_policy(
+    environment: str,
+    expected_secure: bool,
+) -> None:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    try:
+        with Session(engine) as db:
+            username = f"cookie-{environment}"
+            UserService.create_user(
+                db,
+                username=username,
+                email=f"{username}@testweave.com",
+                display_name="Cookie User",
+                password="correct-password",
+            )
+            db.commit()
+
+            settings_kwargs = (
+                {"secret_key": "Y6zvH8qP2nB5sT9wK4mR7xC1dF3jL0aQ"}
+                if environment == "production"
+                else {}
+            )
+            settings = Settings(environment=environment, _env_file=None, **settings_kwargs)
+            app = create_app(settings=settings, readiness_probe=NotConfiguredReadinessProbe())
+            app.dependency_overrides[get_db] = lambda: db
+            app.dependency_overrides[get_settings] = lambda: settings
+            transport = ASGITransport(app=app)
+
+            async with AsyncClient(
+                transport=transport,
+                base_url="https://test" if expected_secure else "http://test",
+            ) as client:
+                login_response = await client.post(
+                    "/api/v1/auth/login",
+                    json={"username_or_email": username, "password": "correct-password"},
+                )
+                assert login_response.status_code == 200
+
+                logout_response = await client.post("/api/v1/auth/logout")
+                assert logout_response.status_code == 200
+
+        for response in (login_response, logout_response):
+            cookie_headers = response.headers.get_list("set-cookie")
+            assert len(cookie_headers) == 2
+            assert all(("; Secure" in header) is expected_secure for header in cookie_headers)
+    finally:
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()

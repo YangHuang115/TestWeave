@@ -4,6 +4,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
+from testweave.db.models import TestCase as TestCaseModel
+from testweave.db.models import TestCaseEditSession as TestCaseEditSessionModel
 from testweave.modules.projects.service import ProjectService
 from testweave.modules.users.service import UserService
 
@@ -29,6 +31,13 @@ async def case_api_context(client: AsyncClient, session: Session) -> dict[str, A
         owner_id=admin_user.id,
         request_id="req-p-case",
     )
+    other_project = ProjectService.create_project(
+        session,
+        key="APICASEOTHER",
+        name="Other API Case Project",
+        owner_id=admin_user.id,
+        request_id="req-p-case-other",
+    )
     session.commit()
 
     # 登录 session 获得 Cookie 鉴权与 CSRF Token
@@ -44,6 +53,7 @@ async def case_api_context(client: AsyncClient, session: Session) -> dict[str, A
     return {
         "admin_user": admin_user,
         "project": project,
+        "other_project": other_project,
         "headers": headers,
     }
 
@@ -202,3 +212,154 @@ async def test_test_cases_api_lifecycle(
     revs_data = res_revs.json()
     assert len(revs_data) == 2
     assert revs_data[0]["revisionNo"] == 2
+
+    # 8. 同项目放弃新编辑会话
+    res_sess_abandon = await client.post(
+        f"/api/v1/projects/{project_id}/test-cases/{case_id}/edit-sessions",
+        headers=headers,
+    )
+    assert res_sess_abandon.status_code == 200
+    abandon_session_id = res_sess_abandon.json()["id"]
+
+    res_abandon = await client.post(
+        f"/api/v1/projects/{project_id}/test-cases/{case_id}/edit-sessions/{abandon_session_id}/abandon",
+        headers=headers,
+    )
+    assert res_abandon.status_code == 200
+    assert res_abandon.json()["status"] == "ABANDONED"
+
+
+@pytest.mark.anyio
+async def test_case_module_endpoints_reject_cross_project_ids(
+    client: AsyncClient,
+    case_api_context: dict[str, Any],
+) -> None:
+    project_id = str(case_api_context["project"].id)
+    other_project_id = str(case_api_context["other_project"].id)
+    headers = case_api_context["headers"]
+
+    async def create_module(target_project_id: str, name: str) -> str:
+        response = await client.post(
+            f"/api/v1/projects/{target_project_id}/case-modules",
+            json={"name": name},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        return response.json()["id"]
+
+    local_module_id = await create_module(project_id, "Local module")
+    foreign_module_id = await create_module(other_project_id, "Foreign module")
+    foreign_parent_id = await create_module(other_project_id, "Foreign parent")
+    foreign_archive_id = await create_module(other_project_id, "Foreign archive")
+
+    responses = [
+        await client.post(
+            f"/api/v1/projects/{project_id}/case-modules",
+            json={"name": "Cross-project child", "parentId": foreign_parent_id},
+            headers=headers,
+        ),
+        await client.put(
+            f"/api/v1/projects/{project_id}/case-modules/{foreign_module_id}",
+            json={"name": "Leaked update", "sortOrder": 0},
+            headers=headers,
+        ),
+        await client.put(
+            f"/api/v1/projects/{project_id}/case-modules/{foreign_module_id}/move",
+            json={"targetParentId": None},
+            headers=headers,
+        ),
+        await client.put(
+            f"/api/v1/projects/{project_id}/case-modules/{local_module_id}/move",
+            json={"targetParentId": foreign_parent_id},
+            headers=headers,
+        ),
+        await client.post(
+            f"/api/v1/projects/{project_id}/case-modules/{foreign_archive_id}/archive",
+            headers=headers,
+        ),
+    ]
+
+    assert [response.status_code for response in responses] == [404, 404, 404, 404, 404]
+    assert [response.json()["code"] for response in responses] == [
+        "CASE_MODULE_NOT_FOUND",
+        "CASE_MODULE_NOT_FOUND",
+        "CASE_MODULE_NOT_FOUND",
+        "CASE_MODULE_NOT_FOUND",
+        "CASE_MODULE_NOT_FOUND",
+    ]
+
+
+@pytest.mark.anyio
+async def test_test_case_editing_endpoints_reject_cross_project_ids(
+    client: AsyncClient,
+    session: Session,
+    case_api_context: dict[str, Any],
+) -> None:
+    project_id = str(case_api_context["project"].id)
+    other_project_id = str(case_api_context["other_project"].id)
+    headers = case_api_context["headers"]
+
+    async def create_case_with_session(title: str) -> tuple[str, str]:
+        create_response = await client.post(
+            f"/api/v1/projects/{other_project_id}/test-cases",
+            json={"title": title, "steps": []},
+            headers=headers,
+        )
+        assert create_response.status_code == 200
+        case_id = create_response.json()["id"]
+
+        session_response = await client.post(
+            f"/api/v1/projects/{other_project_id}/test-cases/{case_id}/edit-sessions",
+            headers=headers,
+        )
+        assert session_response.status_code == 200
+        return case_id, session_response.json()["id"]
+
+    foreign_case_id, foreign_session_id = await create_case_with_session("Foreign case")
+    abandon_case_id, abandon_session_id = await create_case_with_session("Foreign abandon case")
+
+    responses = [
+        await client.post(
+            f"/api/v1/projects/{project_id}/test-cases/{foreign_case_id}/edit-sessions",
+            headers=headers,
+        ),
+        await client.get(
+            f"/api/v1/projects/{project_id}/test-cases/{foreign_case_id}/revisions",
+            headers=headers,
+        ),
+        await client.put(
+            f"/api/v1/projects/{project_id}/test-cases/{foreign_case_id}/edit-sessions/{foreign_session_id}/draft",
+            json={"dirtyFields": {"title": "Cross-project change"}},
+            headers=headers,
+        ),
+        await client.post(
+            f"/api/v1/projects/{project_id}/test-cases/{foreign_case_id}/edit-sessions/{foreign_session_id}/finalize",
+            json={"changeSummary": {"note": "Cross-project finalize"}},
+            headers=headers,
+        ),
+        await client.post(
+            f"/api/v1/projects/{project_id}/test-cases/{abandon_case_id}/edit-sessions/{abandon_session_id}/abandon",
+            headers=headers,
+        ),
+    ]
+
+    assert [response.status_code for response in responses] == [404, 404, 404, 404, 404]
+    assert [response.json()["code"] for response in responses] == [
+        "TEST_CASE_NOT_FOUND",
+        "TEST_CASE_NOT_FOUND",
+        "EDIT_SESSION_NOT_FOUND",
+        "EDIT_SESSION_NOT_FOUND",
+        "EDIT_SESSION_NOT_FOUND",
+    ]
+
+    session.expire_all()
+    foreign_case = session.get(TestCaseModel, foreign_case_id)
+    foreign_session = session.get(TestCaseEditSessionModel, foreign_session_id)
+    abandon_session = session.get(TestCaseEditSessionModel, abandon_session_id)
+    assert foreign_case is not None
+    assert foreign_case.title == "Foreign case"
+    assert foreign_session is not None
+    assert foreign_session.status == "OPEN"
+    assert foreign_session.dirty_fields == {}
+    assert abandon_session is not None
+    assert abandon_session.status == "OPEN"

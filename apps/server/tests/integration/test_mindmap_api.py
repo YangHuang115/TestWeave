@@ -3,13 +3,17 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from testweave.db.models import TestCase as CaseModel
+from testweave.db.models import TestCaseMindmap as CaseMindmapModel
+from testweave.db.models import TestTask as TaskModel
 from testweave.modules.projects.service import ProjectService
-from testweave.modules.users.service import UserService
-from testweave.modules.versions.service import VersionService
 from testweave.modules.requirements.service import RequirementService
 from testweave.modules.test_tasks.service import TestTaskService
+from testweave.modules.users.service import UserService
+from testweave.modules.versions.service import VersionService
 
 pytestmark = pytest.mark.integration
 
@@ -90,6 +94,84 @@ async def mindmap_api_context(client: AsyncClient, session: Session) -> dict[str
     )
     session.commit()
 
+    other_project = ProjectService.create_project(
+        session,
+        key="MMOTHER",
+        name="Other Mindmap Project",
+        owner_id=admin_user.id,
+        request_id="req-p-mm-other",
+    )
+    session.commit()
+    other_version = VersionService.create_version(
+        session,
+        project_id=other_project.id,
+        key="v1.0",
+        name="Other Version 1",
+        owner_id=admin_user.id,
+        planned_start_at=datetime.now(UTC),
+        planned_end_at=datetime.now(UTC) + timedelta(days=10),
+        actor_id=admin_user.id,
+        request_id="req-v-mm-other",
+    )
+    session.commit()
+    other_req = RequirementService.create_requirement(
+        session,
+        project_id=other_project.id,
+        requirement_no="REQ-10000",
+        title="Other mindmap requirement",
+        description="Other project requirement",
+        priority="HIGH",
+        owner_id=admin_user.id,
+        actor_id=admin_user.id,
+        request_id="req-r-mm-other",
+    )
+    RequirementService.associate_to_version(
+        session,
+        project_id=str(other_project.id),
+        requirement_id=str(other_req.id),
+        version_id=str(other_version.id),
+        actor_id=str(admin_user.id),
+        request_id="req-r-mm-other-assoc",
+    )
+    session.commit()
+    other_task = TestTaskService.create_task(
+        session,
+        project_id=other_project.id,
+        version_id=other_version.id,
+        task_type="CASE_DESIGN",
+        title="Other project case design",
+        description="Must remain isolated",
+        priority="HIGH",
+        owner_id=admin_user.id,
+        planned_start_at=now_time,
+        planned_end_at=now_time + timedelta(days=2),
+        test_goal="Verify project isolation",
+        excluded_scope=None,
+        tags_json=["isolation"],
+        actor_id=admin_user.id,
+        request_id="req-task-mm-other",
+        requirement_id=other_req.id,
+    )
+    session.commit()
+
+    execution_task = TaskModel(
+        project_id=project.id,
+        version_id=version.id,
+        task_no="TASK-999999",
+        task_type="TEST_EXECUTION",
+        status="DRAFT",
+        title="Legacy execution task",
+        description="Not eligible for case design",
+        priority="MEDIUM",
+        owner_id=admin_user.id,
+        planned_start_at=now_time,
+        planned_end_at=now_time + timedelta(days=2),
+        created_by=admin_user.id,
+        updated_by=admin_user.id,
+    )
+    session.add(execution_task)
+    session.commit()
+
     # 登录 session 获得 Cookie 鉴权与 CSRF Token
     login_res = await client.post(
         "/api/v1/auth/login",
@@ -104,6 +186,9 @@ async def mindmap_api_context(client: AsyncClient, session: Session) -> dict[str
         "admin_user": admin_user,
         "project": project,
         "task": task,
+        "other_project": other_project,
+        "other_task": other_task,
+        "execution_task": execution_task,
         "headers": headers,
     }
 
@@ -139,14 +224,9 @@ async def test_mindmap_api_lifecycle(
                         {
                             "id": "node-2",
                             "topic": "账号密码登录",
-                            "children": [
-                                {
-                                    "id": "node-3",
-                                    "topic": "提示登录成功"
-                                }
-                            ]
+                            "children": [{"id": "node-3", "topic": "提示登录成功"}],
                         }
-                    ]
+                    ],
                 },
                 {
                     "id": "node-4",
@@ -155,19 +235,14 @@ async def test_mindmap_api_lifecycle(
                         {
                             "id": "node-5",
                             "topic": "密码暴力破解防护",
-                            "children": [
-                                {
-                                    "id": "node-6",
-                                    "topic": "连续错误5次锁定账号"
-                                }
-                            ]
+                            "children": [{"id": "node-6", "topic": "连续错误5次锁定账号"}],
                         }
-                    ]
-                }
-            ]
+                    ],
+                },
+            ],
         }
     }
-    
+
     res_put = await client.put(
         f"/api/v1/projects/{project_id}/test-tasks/{task_id}/mindmap",
         json={"title": "登录深度测试脑图", "data": new_data},
@@ -202,3 +277,99 @@ async def test_mindmap_api_lifecycle(
     assert "正常流程-账号密码登录-提示登录成功" in case_titles
     assert "安全测试-密码暴力破解防护-连续错误5次锁定账号" in case_titles
     assert cases_list[0]["tagsJson"] == ["mindmap-sync"]
+
+
+@pytest.mark.anyio
+async def test_case_and_mindmap_endpoints_reject_foreign_task_id(
+    client: AsyncClient,
+    session: Session,
+    mindmap_api_context: dict[str, Any],
+) -> None:
+    project_id = str(mindmap_api_context["project"].id)
+    foreign_task_id = str(mindmap_api_context["other_task"].id)
+    headers = mindmap_api_context["headers"]
+
+    responses = [
+        await client.post(
+            f"/api/v1/projects/{project_id}/test-cases",
+            json={
+                "title": "Cross-project source task",
+                "sourceTaskId": foreign_task_id,
+                "steps": [],
+            },
+            headers=headers,
+        ),
+        await client.get(
+            f"/api/v1/projects/{project_id}/test-tasks/{foreign_task_id}/mindmap",
+            headers=headers,
+        ),
+        await client.put(
+            f"/api/v1/projects/{project_id}/test-tasks/{foreign_task_id}/mindmap",
+            json={
+                "title": "Cross-project mindmap",
+                "data": {"nodeData": {"id": "root", "topic": "forbidden"}},
+            },
+            headers=headers,
+        ),
+        await client.post(
+            f"/api/v1/projects/{project_id}/test-tasks/{foreign_task_id}/mindmap/sync",
+            headers=headers,
+        ),
+    ]
+
+    assert [response.status_code for response in responses] == [404, 404, 404, 404]
+    assert [response.json()["code"] for response in responses] == [
+        "TEST_TASK_NOT_FOUND",
+        "TEST_TASK_NOT_FOUND",
+        "TEST_TASK_NOT_FOUND",
+        "TEST_TASK_NOT_FOUND",
+    ]
+    assert (
+        session.scalars(
+            select(CaseModel).where(
+                CaseModel.project_id == mindmap_api_context["project"].id,
+                CaseModel.source_task_id == mindmap_api_context["other_task"].id,
+            )
+        ).all()
+        == []
+    )
+    assert (
+        session.scalars(
+            select(CaseMindmapModel).where(
+                CaseMindmapModel.task_id == mindmap_api_context["other_task"].id
+            )
+        ).all()
+        == []
+    )
+
+
+@pytest.mark.anyio
+async def test_case_and_mindmap_require_case_design_task(
+    client: AsyncClient,
+    mindmap_api_context: dict[str, Any],
+) -> None:
+    project_id = str(mindmap_api_context["project"].id)
+    execution_task_id = str(mindmap_api_context["execution_task"].id)
+    headers = mindmap_api_context["headers"]
+
+    responses = [
+        await client.post(
+            f"/api/v1/projects/{project_id}/test-cases",
+            json={
+                "title": "Wrong task type",
+                "sourceTaskId": execution_task_id,
+                "steps": [],
+            },
+            headers=headers,
+        ),
+        await client.get(
+            f"/api/v1/projects/{project_id}/test-tasks/{execution_task_id}/mindmap",
+            headers=headers,
+        ),
+    ]
+
+    assert [response.status_code for response in responses] == [404, 404]
+    assert [response.json()["code"] for response in responses] == [
+        "TEST_TASK_NOT_FOUND",
+        "TEST_TASK_NOT_FOUND",
+    ]

@@ -36,7 +36,6 @@ class CaseModuleUpdateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-
 class CaseModuleMoveRequest(BaseModel):
     targetParentId: UUID | None = Field(None, alias="targetParentId")
 
@@ -102,6 +101,7 @@ def update_module(
     """修改用例模块基本信息"""
     module = CaseModuleService.update_module(
         db,
+        project_id=str(projectId),
         module_id=str(moduleId),
         name=payload.name,
         description=payload.description,
@@ -124,6 +124,7 @@ def move_module(
     """移动模块（防循环）"""
     module = CaseModuleService.move_module(
         db,
+        project_id=str(projectId),
         module_id=str(moduleId),
         target_parent_id=str(payload.targetParentId) if payload.targetParentId else None,
     )
@@ -140,6 +141,10 @@ def archive_module(
     _: None = Depends(require_project_permission(VERSION_MANAGE)),
 ) -> CaseModuleResponse:
     """归档模块（受防空拦截限制）"""
-    module = CaseModuleService.archive_module(db, module_id=str(moduleId))
+    module = CaseModuleService.archive_module(
+        db,
+        project_id=str(projectId),
+        module_id=str(moduleId),
+    )
     db.commit()
     return CaseModuleResponse.model_validate(module)

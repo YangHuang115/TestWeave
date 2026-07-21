@@ -1,4 +1,3 @@
-
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -169,7 +168,7 @@ def test_edit_session_lifecycle(db: Session, case_test_context: dict) -> None:
     db.commit()
 
     # 1. 开启会话
-    session = TestCaseService.start_edit_session(db, case.id, user.id)
+    session = TestCaseService.start_edit_session(db, project.id, case.id, user.id)
     db.commit()
 
     assert session.id is not None
@@ -177,17 +176,19 @@ def test_edit_session_lifecycle(db: Session, case_test_context: dict) -> None:
     assert session.base_row_version == 1
 
     # 2. 幂等测试：同用户再次进入返回同一个会话
-    session_again = TestCaseService.start_edit_session(db, case.id, user.id)
+    session_again = TestCaseService.start_edit_session(db, project.id, case.id, user.id)
     assert session_again.id == session.id
 
     # 3. 冲突测试：其它用户不能强抢正在打开的活跃会话
     with pytest.raises(AppError) as exc_info:
-        TestCaseService.start_edit_session(db, case.id, user2.id)
+        TestCaseService.start_edit_session(db, project.id, case.id, user2.id)
     assert exc_info.value.code == "CASE_EDIT_SESSION_CONFLICT"
 
     # 4. 暂存修改 (更新 title)
     TestCaseService.update_session_draft(
         db,
+        project_id=project.id,
+        case_id=case.id,
         session_id=session.id,
         dirty_fields={"title": "更新后的标题", "tags_json": ["新标签"]},
         actor_id=user.id,
@@ -202,6 +203,8 @@ def test_edit_session_lifecycle(db: Session, case_test_context: dict) -> None:
     # 5. 再次暂存修改 (更新 steps)
     TestCaseService.update_session_draft(
         db,
+        project_id=project.id,
+        case_id=case.id,
         session_id=session.id,
         dirty_fields={
             "steps": [
@@ -216,6 +219,8 @@ def test_edit_session_lifecycle(db: Session, case_test_context: dict) -> None:
     # 6. 合并提交会话
     revision = TestCaseService.finalize_edit_session(
         db,
+        project_id=project.id,
+        case_id=case.id,
         session_id=session.id,
         actor_id=user.id,
         change_summary={"type": "UPDATE", "note": "修改标题与步骤"},
@@ -266,15 +271,29 @@ def test_edit_session_optimistic_lock(db: Session, case_test_context: dict) -> N
     db.commit()
 
     # 会话1：用户1开启
-    session1 = TestCaseService.start_edit_session(db, case.id, user.id)
-    TestCaseService.update_session_draft(db, session1.id, {"title": "用户1修改的标题"}, user.id)
+    session1 = TestCaseService.start_edit_session(db, project.id, case.id, user.id)
+    TestCaseService.update_session_draft(
+        db,
+        project.id,
+        case.id,
+        session1.id,
+        {"title": "用户1修改的标题"},
+        user.id,
+    )
     db.commit()
 
     # 为了模拟并发，我们手动将 session1 置为 FINALIZED (或者在正常流程下提交它)，
     # 因为 start_edit_session 会在有 OPEN 状态其它人会话时报错，
     # 我们可以通过以下步骤测试乐观锁冲突：
     # 1. 提交会话 1
-    TestCaseService.finalize_edit_session(db, session1.id, user.id, {"note": "用户1完成"})
+    TestCaseService.finalize_edit_session(
+        db,
+        project.id,
+        case.id,
+        session1.id,
+        user.id,
+        {"note": "用户1完成"},
+    )
     db.commit()
     # 此时用例已更新，row_version 自增至 2
 
@@ -289,13 +308,13 @@ def test_edit_session_optimistic_lock(db: Session, case_test_context: dict) -> N
     # row_version，那么用户 2 就会被乐观锁拦截。
     # 我们也可以直接在测试里手动构造一个“拥有陈旧 base_row_version 的会话”！
     # 这样可以 100% 确认 finalize_edit_session 的乐观锁比对机制正常工作。
-    
+
     # 手动创建一个陈旧会话（基于 base_row_version = 1）
     stale_session = TestCaseEditSession(
         case_id=case.id,
         actor_id=user2.id,
-        base_revision_id=case.current_revision_id, # 虽然 ID 可以是最新的，但版本号不一致
-        base_row_version=1, # 故意设为旧版 (目前实际 row_version 已经是 2)
+        base_revision_id=case.current_revision_id,  # 虽然 ID 可以是最新的，但版本号不一致
+        base_row_version=1,  # 故意设为旧版 (目前实际 row_version 已经是 2)
         status="OPEN",
         dirty_fields={"title": "用户2尝试覆盖的标题"},
     )
@@ -304,7 +323,14 @@ def test_edit_session_optimistic_lock(db: Session, case_test_context: dict) -> N
 
     # 用户 2 尝试提交这个陈旧会话，应当触发乐观锁冲突报错
     with pytest.raises(AppError) as exc_info:
-        TestCaseService.finalize_edit_session(db, stale_session.id, user2.id, {"note": "用户2覆盖"})
+        TestCaseService.finalize_edit_session(
+            db,
+            project.id,
+            case.id,
+            stale_session.id,
+            user2.id,
+            {"note": "用户2覆盖"},
+        )
     assert exc_info.value.code == "CASE_OPTIMISTIC_LOCK_CONFLICT"
 
 
@@ -339,7 +365,7 @@ def test_module_crud_and_validation(db: Session, case_test_context: dict) -> Non
 
     # 将 m2 ("支付宝通道") 修改为同级的 "微信通道" 应当报错
     with pytest.raises(AppError) as exc_info:
-        CaseModuleService.update_module(db, m2.id, "微信通道")
+        CaseModuleService.update_module(db, project.id, m2.id, "微信通道")
     assert exc_info.value.code == "CASE_MODULE_NAME_DUPLICATED"
 
 
@@ -351,9 +377,7 @@ def test_module_tree_generation(db: Session, case_test_context: dict) -> None:
     # 根模块 B (sort_order=1) -> 子模块 B1
     CaseModuleService.create_module(db, project.id, "模块A", sort_order=2)
     root_b = CaseModuleService.create_module(db, project.id, "模块B", sort_order=1)
-    CaseModuleService.create_module(
-        db, project.id, "子模块B1", parent_id=root_b.id, sort_order=1
-    )
+    CaseModuleService.create_module(db, project.id, "子模块B1", parent_id=root_b.id, sort_order=1)
     db.commit()
 
     tree = CaseModuleService.get_module_tree(db, project.id)
@@ -376,16 +400,16 @@ def test_module_move_cyclic_check(db: Session, case_test_context: dict) -> None:
 
     # 1. 尝试将 A 移到自身之下 -> 报错
     with pytest.raises(AppError) as exc_info:
-        CaseModuleService.move_module(db, mod_a.id, mod_a.id)
+        CaseModuleService.move_module(db, project.id, mod_a.id, mod_a.id)
     assert exc_info.value.code == "CASE_MODULE_CYCLIC_DEPENDENCY"
 
     # 2. 尝试将 A 移到其子节点 C 之下 -> 报错
     with pytest.raises(AppError) as exc_info:
-        CaseModuleService.move_module(db, mod_a.id, mod_c.id)
+        CaseModuleService.move_module(db, project.id, mod_a.id, mod_c.id)
     assert exc_info.value.code == "CASE_MODULE_CYCLIC_DEPENDENCY"
 
     # 3. 正常移动：将 C 移到 A 之下 (平行于 B)
-    moved = CaseModuleService.move_module(db, mod_c.id, mod_a.id)
+    moved = CaseModuleService.move_module(db, project.id, mod_c.id, mod_a.id)
     db.commit()
     assert moved.parent_id == mod_a.id
 
@@ -395,14 +419,12 @@ def test_module_archive_restrictions(db: Session, case_test_context: dict) -> No
     project = case_test_context["project"]
 
     mod_parent = CaseModuleService.create_module(db, project.id, "父模块")
-    mod_child = CaseModuleService.create_module(
-        db, project.id, "子模块", parent_id=mod_parent.id
-    )
+    mod_child = CaseModuleService.create_module(db, project.id, "子模块", parent_id=mod_parent.id)
     db.commit()
 
     # 1. 尝试归档父模块 (有子模块存在，禁止)
     with pytest.raises(AppError) as exc_info:
-        CaseModuleService.archive_module(db, mod_parent.id)
+        CaseModuleService.archive_module(db, project.id, mod_parent.id)
     assert exc_info.value.code == "CASE_MODULE_HAS_CHILDREN"
 
     # 2. 创建一个用例并关联到子模块
@@ -426,12 +448,12 @@ def test_module_archive_restrictions(db: Session, case_test_context: dict) -> No
 
     # 3. 尝试归档子模块 (有用例关联，禁止)
     with pytest.raises(AppError) as exc_info:
-        CaseModuleService.archive_module(db, mod_child.id)
+        CaseModuleService.archive_module(db, project.id, mod_child.id)
     assert exc_info.value.code == "CASE_MODULE_HAS_TEST_CASES"
 
     # 4. 正常归档无关联的空模块
     mod_empty = CaseModuleService.create_module(db, project.id, "空模块")
     db.commit()
-    archived = CaseModuleService.archive_module(db, mod_empty.id)
+    archived = CaseModuleService.archive_module(db, project.id, mod_empty.id)
     db.commit()
     assert archived.archived_at is not None

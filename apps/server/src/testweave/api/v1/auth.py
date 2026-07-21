@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from testweave.api.dependencies.auth import get_current_user
 from testweave.api.dependencies.database import get_db
+from testweave.core.config import Settings, get_settings
 from testweave.core.errors import AppError, ErrorResponse
 from testweave.core.security import generate_session_token
 from testweave.db.models import User
@@ -40,6 +41,7 @@ def login(
     response: Response,
     payload: LoginRequest,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> Any:
     """用户登录接口，成功后返回用户信息并设置 HttpOnly session_token Cookie 与 xsrf_token Cookie"""
     try:
@@ -62,6 +64,7 @@ def login(
     xsrf_token = generate_session_token()
 
     max_age_seconds = int(SESSION_ABSOLUTE_LIFETIME.total_seconds())
+    secure_cookie = settings.environment == "production"
 
     # 设置 Session Cookie (HttpOnly)
     response.set_cookie(
@@ -71,7 +74,7 @@ def login(
         samesite="lax",
         path="/",
         max_age=max_age_seconds,
-        secure=False,  # 本地开发和测试通过 http 运行，设为 False。生产建议由 Nginx 终止 SSL 或判断
+        secure=secure_cookie,
     )
 
     # 设置 CSRF Cookie (非 HttpOnly，便于前端 JS 读取传递到 Header)
@@ -82,7 +85,7 @@ def login(
         samesite="lax",
         path="/",
         max_age=max_age_seconds,
-        secure=False,
+        secure=secure_cookie,
     )
 
     return user
@@ -93,6 +96,7 @@ def logout(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> Any:
     """用户退出登录接口，清除 Session Cookie 并撤销会话"""
     session_token = request.cookies.get("session_token")
@@ -101,8 +105,21 @@ def logout(
         db.commit()
 
     # 清除 Cookie
-    response.delete_cookie("session_token", path="/")
-    response.delete_cookie("xsrf_token", path="/")
+    secure_cookie = settings.environment == "production"
+    response.delete_cookie(
+        "session_token",
+        path="/",
+        secure=secure_cookie,
+        httponly=True,
+        samesite="lax",
+    )
+    response.delete_cookie(
+        "xsrf_token",
+        path="/",
+        secure=secure_cookie,
+        httponly=False,
+        samesite="lax",
+    )
 
     return {"status": "ok"}
 

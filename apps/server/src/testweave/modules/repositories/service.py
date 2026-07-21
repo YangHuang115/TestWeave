@@ -1,13 +1,14 @@
 import uuid
 from datetime import UTC, datetime
-from sqlalchemy.orm import Session
+
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from testweave.core.errors import AppError
 from testweave.db.models import CodeRepository
 from testweave.infrastructure.git import GitClient
-from testweave.shared.crypto import CryptoService
 from testweave.modules.audit.service import AuditService
+from testweave.shared.crypto import CryptoService
 
 
 class RepositoryService:
@@ -44,23 +45,36 @@ class RepositoryService:
         actor_id: str,
         request_id: str,
     ) -> CodeRepository:
+        normalized_remote_url = GitClient.validate_remote_url_syntax(remote_url)
+        normalized_auth_type = GitClient.validate_auth_type(auth_type)
+        normalized_main_branch = GitClient.validate_main_branch(main_branch)
+        repo = RepositoryService.get_repository_by_project_id(db, project_id)
+        endpoint_unchanged = bool(
+            repo
+            and repo.remote_url.strip() == normalized_remote_url
+            and repo.auth_type == normalized_auth_type
+        )
+
         # 1. 验证 Git 网络及凭证连接性 (如果 enabled)
         if enabled:
-            # 如果是更新且没有传新凭证，需要读取已有的老凭证做测试连接
             test_cred = credential_content
-            if test_cred is None:
-                existing = RepositoryService.get_repository_by_project_id(db, project_id)
-                if existing and existing.credential_ref:
-                    test_cred = CryptoService.decrypt(existing.credential_ref)
+            if not (test_cred and test_cred.strip()):
+                test_cred = None
+                if endpoint_unchanged and repo and repo.credential_ref:
+                    test_cred = CryptoService.decrypt(repo.credential_ref)
+                elif normalized_auth_type != "NONE":
+                    raise AppError(
+                        code="REPOSITORY_CREDENTIAL_REQUIRED",
+                        message="仓库地址或认证方式变更后必须重新提供凭证",
+                        status_code=400,
+                    )
 
             RepositoryService.verify_connection(
-                remote_url=remote_url,
-                auth_type=auth_type,
+                remote_url=normalized_remote_url,
+                auth_type=normalized_auth_type,
                 credential_content=test_cred,
-                main_branch=main_branch,
+                main_branch=normalized_main_branch,
             )
-
-        repo = RepositoryService.get_repository_by_project_id(db, project_id)
 
         # 2. 如果存在则更新
         if repo:
@@ -72,30 +86,36 @@ class RepositoryService:
                 )
 
             repo.name = name.strip()
-            repo.remote_url = remote_url.strip()
-            repo.auth_type = auth_type
-            repo.main_branch = main_branch.strip()
+            repo.remote_url = normalized_remote_url
+            repo.auth_type = normalized_auth_type
+            repo.main_branch = normalized_main_branch
             repo.enabled = enabled
             repo.row_version += 1
             repo.updated_at = datetime.now(UTC)
 
-            # 仅在传入新凭证时加密更新，未传则保持原凭证不变
-            if credential_content is not None:
+            # 凭证只与原地址和认证方式绑定；端点变化时不得静默复用旧凭证。
+            if credential_content and credential_content.strip():
                 repo.credential_ref = CryptoService.encrypt(credential_content)
+            elif not endpoint_unchanged or credential_content is not None:
+                repo.credential_ref = None
 
             action = "UPDATE"
         else:
             # 3. 不存在则创建
-            encrypted_ref = CryptoService.encrypt(credential_content) if credential_content else None
+            encrypted_ref = (
+                CryptoService.encrypt(credential_content)
+                if credential_content and credential_content.strip()
+                else None
+            )
             repo = CodeRepository(
                 project_id=uuid.UUID(str(project_id)),
                 repository_type="GIT",
                 provider_type="GENERIC",
                 name=name.strip(),
-                remote_url=remote_url.strip(),
-                auth_type=auth_type,
+                remote_url=normalized_remote_url,
+                auth_type=normalized_auth_type,
                 credential_ref=encrypted_ref,
-                main_branch=main_branch.strip(),
+                main_branch=normalized_main_branch,
                 enabled=enabled,
                 sync_status="NOT_SYNCED",
                 row_version=1,

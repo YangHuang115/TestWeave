@@ -14,20 +14,78 @@ from testweave.db.models import (
     Project,
     TestCase,
     TestCaseEditSession,
+    TestCaseMindmap,
     TestCaseModuleRelation,
     TestCaseRevision,
     TestCaseStep,
     TestTask,
     User,
-    TestCaseMindmap,
 )
+from testweave.modules.test_tasks.service import TestTaskService
 
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def _get_active_case_design_task(
+    db: Session,
+    project_id: str,
+    task_id: str,
+) -> TestTask:
+    task = TestTaskService.get_task_by_id(db, project_id, task_id)
+    if task.task_type != "CASE_DESIGN" or task.archived_at is not None:
+        raise AppError(
+            code="TEST_TASK_NOT_FOUND",
+            message="测试任务不存在或无权限访问",
+            status_code=404,
+        )
+    return task
+
+
 class TestCaseService:
+    @staticmethod
+    def _get_project_case(db: Session, project_id: str, case_id: str) -> TestCase:
+        proj_uuid = uuid.UUID(str(project_id))
+        case_uuid = uuid.UUID(str(case_id))
+        stmt = select(TestCase).where(
+            TestCase.id == case_uuid,
+            TestCase.project_id == proj_uuid,
+            TestCase.deleted_at.is_(None),
+        )
+        case = db.scalar(stmt)
+        if not case:
+            raise AppError(code="TEST_CASE_NOT_FOUND", message="测试用例不存在", status_code=404)
+        return case
+
+    @staticmethod
+    def _get_open_project_session(
+        db: Session,
+        project_id: str,
+        case_id: str,
+        session_id: str,
+    ) -> TestCaseEditSession:
+        proj_uuid = uuid.UUID(str(project_id))
+        case_uuid = uuid.UUID(str(case_id))
+        sess_uuid = uuid.UUID(str(session_id))
+        stmt = (
+            select(TestCaseEditSession)
+            .join(TestCase, TestCase.id == TestCaseEditSession.case_id)
+            .where(
+                TestCaseEditSession.id == sess_uuid,
+                TestCaseEditSession.case_id == case_uuid,
+                TestCaseEditSession.status == "OPEN",
+                TestCase.project_id == proj_uuid,
+                TestCase.deleted_at.is_(None),
+            )
+        )
+        session = db.scalar(stmt)
+        if not session:
+            raise AppError(
+                code="EDIT_SESSION_NOT_FOUND", message="活跃的编辑会话不存在", status_code=404
+            )
+        return session
+
     @staticmethod
     def generate_next_case_no(db: Session, project_id: str) -> str:
         """悲观锁并发安全生成下一个用例编号：TC-XXXXXX"""
@@ -79,11 +137,7 @@ class TestCaseService:
 
         # 校验关联任务
         if source_task_id:
-            task = db.get(TestTask, uuid.UUID(str(source_task_id)))
-            if not task:
-                raise AppError(
-                    code="TEST_TASK_NOT_FOUND", message="来源测试任务不存在", status_code=404
-                )
+            _get_active_case_design_task(db, project_id, source_task_id)
 
         # 自动生成编号
         case_no = TestCaseService.generate_next_case_no(db, project_id)
@@ -180,18 +234,20 @@ class TestCaseService:
         return case
 
     @staticmethod
-    def start_edit_session(db: Session, case_id: str, actor_id: str) -> TestCaseEditSession:
+    def start_edit_session(
+        db: Session,
+        project_id: str,
+        case_id: str,
+        actor_id: str,
+    ) -> TestCaseEditSession:
         """启动或幂等进入一个用例的编辑会话"""
-        case_uuid = uuid.UUID(str(case_id))
         actor_uuid = uuid.UUID(str(actor_id))
 
-        case = db.get(TestCase, case_uuid)
-        if not case or case.deleted_at is not None:
-            raise AppError(code="TEST_CASE_NOT_FOUND", message="测试用例不存在", status_code=404)
+        case = TestCaseService._get_project_case(db, project_id, case_id)
 
         # 检查是否已有开放会话
         stmt = select(TestCaseEditSession).where(
-            TestCaseEditSession.case_id == case_uuid, TestCaseEditSession.status == "OPEN"
+            TestCaseEditSession.case_id == case.id, TestCaseEditSession.status == "OPEN"
         )
         existing_sessions = db.scalars(stmt).all()
 
@@ -215,7 +271,7 @@ class TestCaseService:
 
         # 新开一个会话
         session = TestCaseEditSession(
-            case_id=case_uuid,
+            case_id=case.id,
             actor_id=actor_uuid,
             base_revision_id=case.current_revision_id,
             base_row_version=case.row_version,
@@ -228,17 +284,22 @@ class TestCaseService:
 
     @staticmethod
     def update_session_draft(
-        db: Session, session_id: str, dirty_fields: dict[str, Any], actor_id: str
+        db: Session,
+        project_id: str,
+        case_id: str,
+        session_id: str,
+        dirty_fields: dict[str, Any],
+        actor_id: str,
     ) -> TestCaseEditSession:
         """暂存草稿，合并更新 dirty_fields"""
-        sess_uuid = uuid.UUID(str(session_id))
         actor_uuid = uuid.UUID(str(actor_id))
 
-        session = db.get(TestCaseEditSession, sess_uuid)
-        if not session or session.status != "OPEN":
-            raise AppError(
-                code="EDIT_SESSION_NOT_FOUND", message="活跃的编辑会话不存在", status_code=404
-            )
+        session = TestCaseService._get_open_project_session(
+            db,
+            project_id=project_id,
+            case_id=case_id,
+            session_id=session_id,
+        )
 
         if session.actor_id != actor_uuid:
             raise AppError(
@@ -257,28 +318,29 @@ class TestCaseService:
 
     @staticmethod
     def finalize_edit_session(
-        db: Session, session_id: str, actor_id: str, change_summary: dict[str, Any]
+        db: Session,
+        project_id: str,
+        case_id: str,
+        session_id: str,
+        actor_id: str,
+        change_summary: dict[str, Any],
     ) -> TestCaseRevision:
         """合并提交并发布编辑会话，产生新修订快照"""
-        sess_uuid = uuid.UUID(str(session_id))
         actor_uuid = uuid.UUID(str(actor_id))
 
-        session = db.get(TestCaseEditSession, sess_uuid)
-        if not session or session.status != "OPEN":
-            raise AppError(
-                code="EDIT_SESSION_NOT_FOUND", message="活跃的编辑会话不存在", status_code=404
-            )
+        session = TestCaseService._get_open_project_session(
+            db,
+            project_id=project_id,
+            case_id=case_id,
+            session_id=session_id,
+        )
 
         if session.actor_id != actor_uuid:
             raise AppError(
                 code="EDIT_SESSION_FORBIDDEN", message="无权提交该编辑会话", status_code=403
             )
 
-        case = db.get(TestCase, session.case_id)
-        if not case or case.deleted_at is not None:
-            raise AppError(
-                code="TEST_CASE_NOT_FOUND", message="要修改的用例已被删除", status_code=404
-            )
+        case = TestCaseService._get_project_case(db, project_id, case_id)
 
         # 乐观锁校验
         if case.row_version != session.base_row_version:
@@ -396,16 +458,22 @@ class TestCaseService:
         return revision
 
     @staticmethod
-    def abandon_edit_session(db: Session, session_id: str, actor_id: str) -> TestCaseEditSession:
+    def abandon_edit_session(
+        db: Session,
+        project_id: str,
+        case_id: str,
+        session_id: str,
+        actor_id: str,
+    ) -> TestCaseEditSession:
         """放弃会话，置状态为 ABANDONED"""
-        sess_uuid = uuid.UUID(str(session_id))
         actor_uuid = uuid.UUID(str(actor_id))
 
-        session = db.get(TestCaseEditSession, sess_uuid)
-        if not session or session.status != "OPEN":
-            raise AppError(
-                code="EDIT_SESSION_NOT_FOUND", message="活跃的编辑会话不存在", status_code=404
-            )
+        session = TestCaseService._get_open_project_session(
+            db,
+            project_id=project_id,
+            case_id=case_id,
+            session_id=session_id,
+        )
 
         if session.actor_id != actor_uuid:
             raise AppError(
@@ -418,6 +486,26 @@ class TestCaseService:
 
 
 class CaseModuleService:
+    @staticmethod
+    def _get_active_project_module(
+        db: Session,
+        project_id: str,
+        module_id: str,
+    ) -> CaseModule:
+        proj_uuid = uuid.UUID(str(project_id))
+        mod_uuid = uuid.UUID(str(module_id))
+        stmt = select(CaseModule).where(
+            CaseModule.id == mod_uuid,
+            CaseModule.project_id == proj_uuid,
+            CaseModule.archived_at.is_(None),
+        )
+        module = db.scalar(stmt)
+        if not module:
+            raise AppError(
+                code="CASE_MODULE_NOT_FOUND", message="用例模块不存在或已归档", status_code=404
+            )
+        return module
+
     @staticmethod
     def get_module_tree(db: Session, project_id: str) -> list[dict[str, Any]]:
         """获取项目的所有未归档模块树"""
@@ -472,11 +560,7 @@ class CaseModuleService:
 
         # 校验父模块
         if parent_uuid:
-            parent = db.get(CaseModule, parent_uuid)
-            if not parent or parent.project_id != proj_uuid or parent.archived_at is not None:
-                raise AppError(
-                    code="PARENT_MODULE_INVALID", message="父模块不存在或已归档", status_code=400
-                )
+            CaseModuleService._get_active_project_module(db, project_id, str(parent_uuid))
 
         # 唯一性校验（同父模块下名称不能重复）
         name_clean = name.strip()
@@ -508,6 +592,7 @@ class CaseModuleService:
     @staticmethod
     def update_module(
         db: Session,
+        project_id: str,
         module_id: str,
         name: str,
         description: str | None = None,
@@ -515,11 +600,7 @@ class CaseModuleService:
     ) -> CaseModule:
         """修改模块基本信息"""
         mod_uuid = uuid.UUID(str(module_id))
-        module = db.get(CaseModule, mod_uuid)
-        if not module or module.archived_at is not None:
-            raise AppError(
-                code="CASE_MODULE_NOT_FOUND", message="用例模块不存在或已归档", status_code=404
-            )
+        module = CaseModuleService._get_active_project_module(db, project_id, module_id)
 
         name_clean = name.strip()
         # 唯一性校验
@@ -545,16 +626,21 @@ class CaseModuleService:
         return module
 
     @staticmethod
-    def move_module(db: Session, module_id: str, target_parent_id: str | None) -> CaseModule:
+    def move_module(
+        db: Session,
+        project_id: str,
+        module_id: str,
+        target_parent_id: str | None,
+    ) -> CaseModule:
         """移动模块，支持父子移动的循环依赖检测"""
+        proj_uuid = uuid.UUID(str(project_id))
         mod_uuid = uuid.UUID(str(module_id))
         target_uuid = uuid.UUID(str(target_parent_id)) if target_parent_id else None
 
-        module = db.get(CaseModule, mod_uuid)
-        if not module or module.archived_at is not None:
-            raise AppError(
-                code="CASE_MODULE_NOT_FOUND", message="用例模块不存在或已归档", status_code=404
-            )
+        module = CaseModuleService._get_active_project_module(db, project_id, module_id)
+
+        if target_uuid:
+            CaseModuleService._get_active_project_module(db, project_id, str(target_uuid))
 
         if mod_uuid == target_uuid:
             raise AppError(
@@ -576,9 +662,18 @@ class CaseModuleService:
             if curr_uuid in visited:
                 break
             visited.add(curr_uuid)
-            parent_mod = db.get(CaseModule, curr_uuid)
+            parent_stmt = select(CaseModule).where(
+                CaseModule.id == curr_uuid,
+                CaseModule.project_id == proj_uuid,
+                CaseModule.archived_at.is_(None),
+            )
+            parent_mod = db.scalar(parent_stmt)
             if not parent_mod:
-                break
+                raise AppError(
+                    code="CASE_MODULE_NOT_FOUND",
+                    message="用例模块不存在或已归档",
+                    status_code=404,
+                )
             curr_uuid = parent_mod.parent_id
 
         # 唯一性校验（目标父模块下不能重名）
@@ -602,18 +697,17 @@ class CaseModuleService:
         return module
 
     @staticmethod
-    def archive_module(db: Session, module_id: str) -> CaseModule:
+    def archive_module(db: Session, project_id: str, module_id: str) -> CaseModule:
         """归档模块，受防空归档限制（有子模块或有用例则禁止归档）"""
+        proj_uuid = uuid.UUID(str(project_id))
         mod_uuid = uuid.UUID(str(module_id))
-        module = db.get(CaseModule, mod_uuid)
-        if not module or module.archived_at is not None:
-            raise AppError(
-                code="CASE_MODULE_NOT_FOUND", message="用例模块不存在或已归档", status_code=404
-            )
+        module = CaseModuleService._get_active_project_module(db, project_id, module_id)
 
         # 检查是否含有未归档的子模块
         child_stmt = select(CaseModule).where(
-            CaseModule.parent_id == mod_uuid, CaseModule.archived_at.is_(None)
+            CaseModule.project_id == proj_uuid,
+            CaseModule.parent_id == mod_uuid,
+            CaseModule.archived_at.is_(None),
         )
         has_child = db.scalar(child_stmt)
         if has_child:
@@ -652,6 +746,7 @@ class CaseMindmapService:
         task_id: str,
     ) -> TestCaseMindmap:
         """获取或创建任务关联的脑图"""
+        _get_active_case_design_task(db, project_id, task_id)
         proj_uuid = uuid.UUID(str(project_id))
         task_uuid = uuid.UUID(str(task_id))
 
@@ -688,6 +783,7 @@ class CaseMindmapService:
         data: dict[str, Any],
     ) -> TestCaseMindmap:
         """保存脑图最新数据"""
+        _get_active_case_design_task(db, project_id, task_id)
         proj_uuid = uuid.UUID(str(project_id))
         task_uuid = uuid.UUID(str(task_id))
 
@@ -719,6 +815,7 @@ class CaseMindmapService:
         request_id: str,
     ) -> int:
         """将脑图同步为测试用例列表"""
+        _get_active_case_design_task(db, project_id, task_id)
         proj_uuid = uuid.UUID(str(project_id))
         task_uuid = uuid.UUID(str(task_id))
 
@@ -736,12 +833,14 @@ class CaseMindmapService:
         if not node_data:
             return 0
 
-        def extract_leaf_paths(node: dict[str, Any], current_path: list[str]) -> list[tuple[list[str], str]]:
+        def extract_leaf_paths(
+            node: dict[str, Any], current_path: list[str]
+        ) -> list[tuple[list[str], str]]:
             topic = node.get("topic", "")
             children = node.get("children", [])
             if not children:
                 return [(current_path, topic)]
-            new_path = current_path + [topic]
+            new_path = [*current_path, topic]
             results = []
             for child in children:
                 results.extend(extract_leaf_paths(child, new_path))
@@ -751,8 +850,7 @@ class CaseMindmapService:
 
         # 3. 删除此前在该任务下由脑图同步生成的所有旧用例 (防止重复)
         del_stmt = select(TestCase).where(
-            TestCase.project_id == proj_uuid,
-            TestCase.source_task_id == task_uuid
+            TestCase.project_id == proj_uuid, TestCase.source_task_id == task_uuid
         )
         old_cases = db.scalars(del_stmt).all()
         for oc in old_cases:
@@ -764,9 +862,9 @@ class CaseMindmapService:
         for parent_path, leaf_topic in leaf_paths:
             # 拼接用例标题：如果父级节点丰富，去掉根节点 "测试用例脑图"
             useful_parents = parent_path[1:] if len(parent_path) > 1 else parent_path
-            title = "-".join(useful_parents + [leaf_topic])
+            title = "-".join([*useful_parents, leaf_topic])
             precondition = f"脑图路径: {' > '.join(parent_path)}"
-            
+
             # 组装操作步骤
             step_text = f"按照脑图分支指引操作: {' -> '.join(parent_path)}"
             expected = leaf_topic
@@ -796,7 +894,6 @@ class CaseMindmapService:
                 module_ids=None,
             )
             count += 1
-        
+
         db.flush()
         return count
-

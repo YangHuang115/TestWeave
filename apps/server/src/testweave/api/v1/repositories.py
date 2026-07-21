@@ -1,26 +1,33 @@
-import os
 import gzip
+import os
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, Path, Body
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import select
 
-from testweave.api.dependencies.database import get_db
+from fastapi import APIRouter, Body, Depends, Path, Query
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from testweave.api.dependencies.auth import get_current_user
+from testweave.api.dependencies.database import get_db
 from testweave.api.dependencies.projects import require_project_permission
-from testweave.db.models import User, GitCommit, GitCommitFile, RequirementCommitLink
 from testweave.core.errors import AppError
-from testweave.shared.permissions import VERSION_READ, VERSION_MANAGE
+from testweave.db.models import (
+    CodeRepository,
+    GitCommit,
+    GitCommitFile,
+    RequirementCommitLink,
+    User,
+)
+from testweave.modules.audit.service import AuditService
+from testweave.modules.repositories.matcher import MatcherService
 from testweave.modules.repositories.schemas import (
-    RepositoryVerifyRequest,
     RepositoryCreateOrUpdateRequest,
     RepositoryResponse,
+    RepositoryVerifyRequest,
 )
 from testweave.modules.repositories.service import RepositoryService
 from testweave.modules.repositories.sync import RepositorySyncManager
-from testweave.modules.repositories.matcher import MatcherService
-from testweave.modules.audit.service import AuditService
+from testweave.shared.permissions import VERSION_MANAGE, VERSION_READ
 
 router = APIRouter()
 
@@ -36,7 +43,11 @@ def get_repository_config(
 ):
     repo = RepositoryService.get_repository_by_project_id(db, str(projectId))
     if not repo:
-        raise AppError(code="REPOSITORY_NOT_FOUND", message="该项目尚未配置代码仓库", status_code=404)
+        raise AppError(
+            code="REPOSITORY_NOT_FOUND",
+            message="该项目尚未配置代码仓库",
+            status_code=404,
+        )
 
     res = RepositoryResponse.model_validate(repo)
     res.has_credential = bool(repo.credential_ref)
@@ -89,6 +100,7 @@ def verify_repository_connection(
         existing = RepositoryService.get_repository_by_project_id(db, str(projectId))
         if existing and existing.credential_ref and existing.remote_url == payload.remote_url:
             from testweave.shared.crypto import CryptoService
+
             test_cred = CryptoService.decrypt(existing.credential_ref)
 
     RepositoryService.verify_connection(
@@ -97,7 +109,9 @@ def verify_repository_connection(
         credential_content=test_cred,
         main_branch=payload.main_branch,
     )
-    return JSONResponse(content={"status": "success", "message": "连接验证成功，远程仓库及主干分支有效"})
+    return JSONResponse(
+        content={"status": "success", "message": "连接验证成功，远程仓库及主干分支有效"}
+    )
 
 
 @router.post(
@@ -111,12 +125,22 @@ def trigger_repository_sync(
 ):
     repo = RepositoryService.get_repository_by_project_id(db, str(projectId))
     if not repo:
-        raise AppError(code="REPOSITORY_NOT_FOUND", message="该项目尚未配置代码仓库", status_code=404)
+        raise AppError(
+            code="REPOSITORY_NOT_FOUND",
+            message="该项目尚未配置代码仓库",
+            status_code=404,
+        )
 
-    job = RepositorySyncManager.create_sync_job(db, str(projectId), str(repo.id), str(current_user.id))
+    job = RepositorySyncManager.create_sync_job(
+        db,
+        str(projectId),
+        str(repo.id),
+        str(current_user.id),
+    )
     db.commit()
 
-    # 临时在请求线程中触发 poll（如果在后台多 Worker 下可由独立 worker 轮询，但为了便于前端演示及单机响应，我们在 API 后端也手动触发一次 Worker 调度）
+    # 临时在请求线程中触发 poll。后台多 Worker 可由独立 worker 轮询；
+    # 为便于前端演示及单机响应，API 后端也手动触发一次 Worker 调度。
     RepositorySyncManager.poll_and_execute_jobs(db, f"api-trigger-{current_user.username}")
 
     return {
@@ -162,7 +186,11 @@ def trigger_rematch(
 ):
     repo = RepositoryService.get_repository_by_project_id(db, str(projectId))
     if not repo:
-        raise AppError(code="REPOSITORY_NOT_FOUND", message="该项目尚未配置代码仓库", status_code=404)
+        raise AppError(
+            code="REPOSITORY_NOT_FOUND",
+            message="该项目尚未配置代码仓库",
+            status_code=404,
+        )
 
     links_created = MatcherService.rematch_project_requirements(db, str(projectId))
     db.commit()
@@ -200,7 +228,7 @@ def get_requirement_commits(
         .where(
             RequirementCommitLink.project_id == projectId,
             RequirementCommitLink.requirement_id == requirementId,
-            RequirementCommitLink.status == "ACTIVE"
+            RequirementCommitLink.status == "ACTIVE",
         )
         .order_by(GitCommit.committed_at.desc())
     )
@@ -231,7 +259,11 @@ def get_commit_files(
     db: Session = Depends(get_db),
 ):
     # 验证 commit 是否属于该项目下的仓库
-    stmt_commit = select(GitCommit).where(GitCommit.id == commitId)
+    stmt_commit = (
+        select(GitCommit)
+        .join(CodeRepository, CodeRepository.id == GitCommit.repository_id)
+        .where(GitCommit.id == commitId, CodeRepository.project_id == projectId)
+    )
     commit = db.scalar(stmt_commit)
     if not commit:
         raise AppError(code="COMMIT_NOT_FOUND", message="未找到对应的提交记录", status_code=404)
@@ -265,8 +297,18 @@ def get_file_patch_content(
     fileId: UUID = Path(...),
     db: Session = Depends(get_db),
 ):
-    file_record = db.get(GitCommitFile, fileId)
-    if not file_record or file_record.commit_id != commitId:
+    stmt_file = (
+        select(GitCommitFile)
+        .join(GitCommit, GitCommit.id == GitCommitFile.commit_id)
+        .join(CodeRepository, CodeRepository.id == GitCommit.repository_id)
+        .where(
+            GitCommitFile.id == fileId,
+            GitCommitFile.commit_id == commitId,
+            CodeRepository.project_id == projectId,
+        )
+    )
+    file_record = db.scalar(stmt_file)
+    if not file_record:
         raise AppError(code="FILE_NOT_FOUND", message="未找到对应的文件记录", status_code=404)
 
     if not file_record.patch_storage_key:
@@ -280,7 +322,11 @@ def get_file_patch_content(
 
     patch_path = os.path.join(data_dir, file_record.patch_storage_key)
     if not os.path.exists(patch_path):
-        raise AppError(code="PATCH_NOT_FOUND", message="未找到该文件的差异 Diff 详情", status_code=404)
+        raise AppError(
+            code="PATCH_NOT_FOUND",
+            message="未找到该文件的差异 Diff 详情",
+            status_code=404,
+        )
 
     # gzip 解压为文本
     with gzip.open(patch_path, "rt", encoding="utf-8") as f:

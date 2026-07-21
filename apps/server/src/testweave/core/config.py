@@ -1,8 +1,17 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+MINIMUM_PRODUCTION_SECRET_LENGTH = 32
+MINIMUM_PRODUCTION_SECRET_UNIQUE_CHARACTERS = 8
+KNOWN_INSECURE_SECRET_KEYS = frozenset(
+    {
+        "testweave-default-super-secret-key-32bytes!",
+        "local-development-only-secret-key-change-me",
+    }
+)
 
 
 class Settings(BaseSettings):
@@ -31,7 +40,8 @@ class Settings(BaseSettings):
     migration_lock_timeout_ms: int = Field(default=10_000, ge=1_000, le=60_000)
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     storage_local_dir: str = Field(default="data/storage")
-    secret_key: SecretStr = Field(default="testweave-default-super-secret-key-32bytes!")
+    git_known_hosts_file: str | None = None
+    secret_key: SecretStr | None = None
 
     @field_validator("database_url")
     @classmethod
@@ -49,6 +59,23 @@ class Settings(BaseSettings):
         if "*" in value:
             raise ValueError("启用凭证时不允许使用通配 CORS 来源")
         return value
+
+    @model_validator(mode="after")
+    def require_strong_production_secret_key(self) -> Self:
+        if self.environment != "production":
+            return self
+
+        if self.secret_key is None:
+            raise ValueError("生产环境必须配置 TESTWEAVE_SECRET_KEY")
+
+        secret_key = self.secret_key.get_secret_value()
+        if (
+            len(secret_key) < MINIMUM_PRODUCTION_SECRET_LENGTH
+            or len(set(secret_key)) < MINIMUM_PRODUCTION_SECRET_UNIQUE_CHARACTERS
+            or secret_key in KNOWN_INSECURE_SECRET_KEYS
+        ):
+            raise ValueError("生产环境的 TESTWEAVE_SECRET_KEY 必须使用至少 32 字符的高熵随机值")
+        return self
 
 
 @lru_cache

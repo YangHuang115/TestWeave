@@ -32,6 +32,11 @@ def setup_integration_db() -> Generator[Any, None, None]:
     )
 
     os.environ["TESTWEAVE_DATABASE_URL"] = database_url
+    # 集成测试需要可销毁测试库与测试用加密主密钥；生产环境由强密钥校验保证，这里不提供生产默认值。
+    os.environ.setdefault(
+        "TESTWEAVE_SECRET_KEY",
+        "test-only-disposable-secret-key-not-for-prod-0123456789",
+    )
     get_settings.cache_clear()
 
     config = Config(str(ALEMBIC_CONFIG_PATH))

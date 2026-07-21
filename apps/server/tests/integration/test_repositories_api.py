@@ -1,13 +1,21 @@
 import uuid
-from datetime import datetime
-import pytest
-from unittest.mock import patch
+from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import patch
+
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from testweave.modules.users.service import UserService
+from testweave.db.models import (
+    CodeRepository,
+    GitCommit,
+    GitCommitFile,
+    RequirementCommitLink,
+)
 from testweave.modules.projects.service import ProjectService
+from testweave.modules.requirements.service import RequirementService
+from testweave.modules.users.service import UserService
 
 pytestmark = pytest.mark.integration
 
@@ -15,15 +23,34 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 async def repo_integration_context(client: AsyncClient, session: Session) -> dict[str, Any]:
     admin_user = UserService.create_user(
-        session, username="repoapiadmin", email="rpa@tw.com", display_name="Repo API Admin", password="pwd"
+        session,
+        username="repoapiadmin",
+        email="rpa@tw.com",
+        display_name="Repo API Admin",
+        password="pwd",
     )
-    guest_user = UserService.create_user(
-        session, username="repoapiguest", email="rpg@tw.com", display_name="Repo API Guest", password="pwd"
+    UserService.create_user(
+        session,
+        username="repoapiguest",
+        email="rpg@tw.com",
+        display_name="Repo API Guest",
+        password="pwd",
     )
     session.commit()
 
     project = ProjectService.create_project(
-        session, key="REPOAPIP", name="Repo API Project", owner_id=admin_user.id, request_id="repo-p"
+        session,
+        key="REPOAPIP",
+        name="Repo API Project",
+        owner_id=admin_user.id,
+        request_id="repo-p",
+    )
+    other_project = ProjectService.create_project(
+        session,
+        key="REPOAPIO",
+        name="Other Repo API Project",
+        owner_id=admin_user.id,
+        request_id="repo-other-p",
     )
     session.commit()
 
@@ -42,6 +69,7 @@ async def repo_integration_context(client: AsyncClient, session: Session) -> dic
 
     return {
         "project": project,
+        "other_project": other_project,
         "admin_session": {"cookies": cookies_admin, "headers": {"X-CSRF-Token": csrf_admin}},
         "guest_session": {"cookies": cookies_guest, "headers": {"X-CSRF-Token": csrf_guest}},
     }
@@ -125,7 +153,9 @@ async def test_repository_api_lifecycle(
         "credential_content": "MOCK_KEY_VAL",
         "main_branch": "main",
     }
-    with patch("testweave.modules.repositories.service.RepositoryService.verify_connection") as mock_verify:
+    with patch(
+        "testweave.modules.repositories.service.RepositoryService.verify_connection"
+    ) as mock_verify:
         res_verify = await client.post(
             f"/api/v1/projects/{project.id}/repository/verify",
             json=verify_payload,
@@ -136,10 +166,7 @@ async def test_repository_api_lifecycle(
         assert mock_verify.call_count == 1
 
     # 7. 触发同步测试 (/sync)
-    # 我们 mock 掉 sync_repository，在里面模拟写入一个 GitCommit 和 GitCommitFile 以及关联记录，以测试全流程
-    from testweave.db.models import GitCommit, GitCommitFile, RequirementCommitLink, Requirement
-    from testweave.modules.requirements.service import RequirementService
-
+    # mock 掉 sync_repository，在其中写入 GitCommit、GitCommitFile 和关联记录。
     # 插入一个需求
     req = RequirementService.create_requirement(
         session,
@@ -164,8 +191,8 @@ async def test_repository_api_lifecycle(
             author_email="c@tw.com",
             committer_name="Committer",
             committer_email="c@tw.com",
-            authored_at=datetime.utcnow(),
-            committed_at=datetime.utcnow(),
+            authored_at=datetime.now(UTC),
+            committed_at=datetime.now(UTC),
             message="[REQ-4001] Mock commit for sync testing",
             parent_shas_json=[],
             files_changed=1,
@@ -201,7 +228,10 @@ async def test_repository_api_lifecycle(
         db.add(link)
         db.flush()
 
-    with patch("testweave.modules.repositories.sync.RepositorySyncManager.sync_repository", side_effect=mock_sync_impl):
+    with patch(
+        "testweave.modules.repositories.sync.RepositorySyncManager.sync_repository",
+        side_effect=mock_sync_impl,
+    ):
         res_sync = await client.post(
             f"/api/v1/projects/{project.id}/repository/sync",
             **admin_session,
@@ -241,7 +271,15 @@ async def test_repository_api_lifecycle(
     assert file_list[0]["new_path"] == "src/main.py"
     assert file_list[0]["change_type"] == "ADD"
 
-    # 10. 重匹配测试 (/rematch)
+    # 10. 查询同项目文件补丁
+    res_patch = await client.get(
+        f"/api/v1/projects/{project.id}/commits/{commit_id}/files/{file_list[0]['id']}/patch",
+        **admin_session,
+    )
+    assert res_patch.status_code == 200
+    assert res_patch.json() == {"patch": "", "truncated": False}
+
+    # 11. 重匹配测试 (/rematch)
     res_rematch = await client.post(
         f"/api/v1/projects/{project.id}/repository/rematch",
         **admin_session,
@@ -249,3 +287,70 @@ async def test_repository_api_lifecycle(
     assert res_rematch.status_code == 200
     assert res_rematch.json()["links_rebuilt"] == 1
 
+
+@pytest.mark.anyio
+async def test_repository_diff_endpoints_reject_cross_project_objects(
+    client: AsyncClient,
+    session: Session,
+    repo_integration_context: dict[str, Any],
+) -> None:
+    project = repo_integration_context["project"]
+    other_project = repo_integration_context["other_project"]
+    admin_session = repo_integration_context["admin_session"]
+
+    other_repo = CodeRepository(
+        project_id=other_project.id,
+        name="Other Project Repository",
+        remote_url="git@github.com:example/other.git",
+        auth_type="NONE",
+        main_branch="main",
+        enabled=False,
+    )
+    session.add(other_repo)
+    session.flush()
+
+    other_commit = GitCommit(
+        repository_id=other_repo.id,
+        sha="b" * 40,
+        author_name="Other Author",
+        author_email="other-author@example.com",
+        committer_name="Other Committer",
+        committer_email="other-committer@example.com",
+        authored_at=datetime.now(UTC),
+        committed_at=datetime.now(UTC),
+        message="Other project commit",
+        parent_shas_json=[],
+        files_changed=1,
+        additions=1,
+        deletions=0,
+        is_merge=False,
+        is_reachable_from_main=True,
+    )
+    session.add(other_commit)
+    session.flush()
+
+    other_file = GitCommitFile(
+        commit_id=other_commit.id,
+        new_path="src/private.py",
+        change_type="ADD",
+        is_binary=False,
+        additions=1,
+        deletions=0,
+        patch_storage_key=None,
+    )
+    session.add(other_file)
+    session.commit()
+
+    files_response = await client.get(
+        f"/api/v1/projects/{project.id}/commits/{other_commit.id}/files",
+        **admin_session,
+    )
+    patch_response = await client.get(
+        f"/api/v1/projects/{project.id}/commits/{other_commit.id}/files/{other_file.id}/patch",
+        **admin_session,
+    )
+
+    assert files_response.status_code == 404
+    assert files_response.json()["code"] == "COMMIT_NOT_FOUND"
+    assert patch_response.status_code == 404
+    assert patch_response.json()["code"] == "FILE_NOT_FOUND"
