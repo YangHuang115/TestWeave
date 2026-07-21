@@ -1,0 +1,79 @@
+:root {
+  --tw-color-text: #16221f;
+  --tw-color-text-muted: #5e6b66;
+  --tw-color-accent: #b9f04a;
+  --tw-color-accent-strong: #426b00;
+  --tw-color-border: #d4dbd2;
+  --tw-color-surface: #ffffff;
+  --tw-color-error: #a9342d;
+  --tw-color-focus: #2365d8;
+}
+
+.tw-status-panel {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  padding: 1.4rem;
+  border: 1px solid var(--tw-color-border);
+  border-radius: 1rem;
+  color: var(--tw-color-text);
+  background: color-mix(in srgb, var(--tw-color-surface) 92%, transparent);
+  box-shadow: 0 1.5rem 4rem rgb(34 55 48 / 8%);
+}
+
+.tw-status-panel__marker {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: var(--tw-color-text-muted);
+}
+
+.tw-status-panel--loading .tw-status-panel__marker {
+  animation: tw-pulse 1.2s ease-in-out infinite;
+}
+
+.tw-status-panel--success .tw-status-panel__marker {
+  background: var(--tw-color-accent-strong);
+  box-shadow: 0 0 0 0.35rem color-mix(in srgb, var(--tw-color-accent) 35%, transparent);
+}
+
+.tw-status-panel--error {
+  border-color: color-mix(in srgb, var(--tw-color-error) 35%, var(--tw-color-border));
+}
+
+.tw-status-panel--error .tw-status-panel__marker {
+  background: var(--tw-color-error);
+}
+
+.tw-status-panel h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.tw-status-panel p {
+  margin: 0.45rem 0 0;
+  color: var(--tw-color-text-muted);
+  line-height: 1.55;
+}
+
+.tw-status-panel__request-id code {
+  overflow-wrap: anywhere;
+}
+
+.tw-status-panel__actions {
+  margin-top: 1rem;
+}
+
+@keyframes tw-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-status-panel--loading .tw-status-panel__marker {
+    animation: none;
+  }
+}

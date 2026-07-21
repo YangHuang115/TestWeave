@@ -1,0 +1,33 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# JavaScript
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local caches
+.cache/
+
+# TestWeave local sync storage
+apps/server/data/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+test-results/
+playwright-report/

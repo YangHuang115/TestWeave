@@ -1,0 +1,35 @@
+{
+  "name": "testweave",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13 <23 || >=24 <25",
+    "npm": ">=10 <12"
+  },
+  "workspaces": [
+    "apps/web",
+    "packages/ui"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @testweave/web",
+    "build:web": "npm run build --workspace @testweave/web",
+    "test:web": "npm run test --workspace @testweave/web",
+    "typecheck:web": "npm run typecheck --workspace @testweave/web",
+    "lint:web": "eslint apps/web packages/ui",
+    "format:check": "prettier --check \"apps/web/**/*.{html,json,ts,vue,css}\" \"packages/ui/**/*.{json,ts,vue,css}\" package.json eslint.config.js .prettierrc.json",
+    "format": "prettier --write \"apps/web/**/*.{html,json,ts,vue,css}\" \"packages/ui/**/*.{json,ts,vue,css}\" package.json eslint.config.js .prettierrc.json",
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^24.1.0",
+    "eslint": "^9.31.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.3.0",
+    "globals": "^16.3.0",
+    "prettier": "^3.6.2",
+    "typescript-eslint": "^8.38.0"
+  }
+}
