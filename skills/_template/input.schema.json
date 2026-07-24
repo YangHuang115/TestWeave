@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://testweave.local/schemas/skills/template/input.schema.json",
+  "title": "TestWeave Skill Template Input",
+  "description": "复制模板后替换标题、ID、字段和约束。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "context": {
+      "type": "object",
+      "description": "冻结的授权上下文引用；实际字段待具体 Skill 定义。",
+      "additionalProperties": true
+    },
+    "payload": {
+      "type": "object",
+      "description": "具体 Skill 的业务输入；复制后必须收紧字段。",
+      "additionalProperties": true
+    }
+  },
+  "required": ["context", "payload"]
+}

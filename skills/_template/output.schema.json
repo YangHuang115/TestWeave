@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://testweave.local/schemas/skills/template/output.schema.json",
+  "title": "TestWeave Skill Template Output",
+  "description": "复制模板后替换标题、ID、数据字段、证据和错误约束。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["succeeded", "needs_human", "failed"]
+    },
+    "data": {
+      "type": "object",
+      "description": "具体 Skill 的结构化业务结果；复制后必须收紧字段。",
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sourceRef": { "type": "string", "minLength": 1 },
+          "note": { "type": "string" }
+        },
+        "required": ["sourceRef"]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 },
+          "retryable": { "type": "boolean" }
+        },
+        "required": ["code", "message", "retryable"]
+      }
+    },
+    "humanRequest": {
+      "description": "仅 needs_human 状态使用；说明为什么暂停以及需要用户提供什么。",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reasonCode": { "type": "string", "minLength": 1 },
+            "message": { "type": "string", "minLength": 1 },
+            "requiredInputs": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": ["reasonCode", "message", "requiredInputs"]
+        }
+      ]
+    }
+  },
+  "required": ["status", "data", "evidence", "warnings", "errors", "humanRequest"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "failed" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "errors": { "minItems": 1 },
+          "humanRequest": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "needs_human" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "errors": { "maxItems": 0 },
+          "humanRequest": { "type": "object" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "succeeded" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "errors": { "maxItems": 0 },
+          "humanRequest": { "type": "null" }
+        }
+      }
+    }
+  ]
+}
