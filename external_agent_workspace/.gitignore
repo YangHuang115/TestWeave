@@ -1,0 +1,6 @@
+.env.local
+.testweave/cache/
+.testweave/private-data/
+.testweave/output/
+*.token
+*.secret
