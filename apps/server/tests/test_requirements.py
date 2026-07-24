@@ -1,14 +1,15 @@
 import uuid
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from testweave.core.errors import AppError
-from testweave.db.models import Requirement, Version, VersionRequirement, RequirementCommitLink
-from testweave.modules.requirements.service import RequirementService, normalize_requirement_no
-from testweave.modules.versions.service import VersionService
+from testweave.db.models import RequirementCommitLink, VersionRequirement
 from testweave.modules.projects.service import ProjectService
+from testweave.modules.requirements.service import RequirementService, normalize_requirement_no
 from testweave.modules.users.service import UserService
+from testweave.modules.versions.service import VersionService
 
 
 @pytest.fixture
@@ -111,7 +112,9 @@ def test_create_requirement_key_conflict(db: Session, req_test_context: dict) ->
     assert exc_info.value.code == "REQUIREMENT_KEY_CONFLICT"
 
 
-def test_update_requirement_success_and_optimistic_lock(db: Session, req_test_context: dict) -> None:
+def test_update_requirement_success_and_optimistic_lock(
+    db: Session, req_test_context: dict
+) -> None:
     user = req_test_context["user"]
     project = req_test_context["project"]
 
@@ -192,7 +195,7 @@ def test_update_requirement_no_change_with_commits(db: Session, req_test_context
         project_id=project.id,
         requirement_id=req.id,
         commit_id=uuid.uuid4(),
-        matched_requirement_no="REQ-1001"
+        matched_requirement_no="REQ-1001",
     )
     db.add(commit_link)
     db.commit()
@@ -253,7 +256,12 @@ def test_update_requirement_no_change_with_commits(db: Session, req_test_context
     db.commit()
     assert forced.requirement_no == "REQ-1002"
     # 验证关联已删除
-    assert db.scalar(select(RequirementCommitLink).where(RequirementCommitLink.requirement_id == req.id)) is None
+    assert (
+        db.scalar(
+            select(RequirementCommitLink).where(RequirementCommitLink.requirement_id == req.id)
+        )
+        is None
+    )
 
 
 def test_associate_and_dissociate_version(db: Session, req_test_context: dict) -> None:
@@ -287,8 +295,7 @@ def test_associate_and_dissociate_version(db: Session, req_test_context: dict) -
 
     link = db.scalar(
         select(VersionRequirement).where(
-            VersionRequirement.version_id == version.id,
-            VersionRequirement.requirement_id == req.id
+            VersionRequirement.version_id == version.id, VersionRequirement.requirement_id == req.id
         )
     )
     assert link is not None

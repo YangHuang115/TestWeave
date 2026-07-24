@@ -1,15 +1,17 @@
-import uuid
+import contextlib
 import unicodedata
+import uuid
 from datetime import UTC, datetime
-from sqlalchemy.orm import Session
+
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from testweave.core.errors import AppError
 from testweave.db.models import (
     Requirement,
+    RequirementCommitLink,
     Version,
     VersionRequirement,
-    RequirementCommitLink,
 )
 from testweave.modules.audit.service import AuditService
 
@@ -24,11 +26,13 @@ class RequirementService:
     def get_requirement_by_id(db: Session, project_id: str, requirement_id: str) -> Requirement:
         stmt = select(Requirement).where(
             Requirement.id == uuid.UUID(str(requirement_id)),
-            Requirement.project_id == uuid.UUID(str(project_id))
+            Requirement.project_id == uuid.UUID(str(project_id)),
         )
         req = db.scalar(stmt)
         if not req:
-            raise AppError(code="REQUIREMENT_NOT_FOUND", message="需求不存在或无权限访问", status_code=404)
+            raise AppError(
+                code="REQUIREMENT_NOT_FOUND", message="需求不存在或无权限访问", status_code=404
+            )
         return req
 
     @staticmethod
@@ -40,8 +44,9 @@ class RequirementService:
         existing_nos = db.scalars(stmt).all()
 
         import re
+
         max_num = 10000  # 默认起始为 10001 (10000 + 1)
-        pattern = re.compile(r'(?i)^REQ-(\d+)$')
+        pattern = re.compile(r"(?i)^REQ-(\d+)$")
         for no in existing_nos:
             match = pattern.match(no.strip())
             if match:
@@ -71,7 +76,7 @@ class RequirementService:
         # 校验项目内唯一性
         conflict_stmt = select(Requirement).where(
             Requirement.project_id == project_id,
-            Requirement.requirement_no_normalized == normalized_no
+            Requirement.requirement_no_normalized == normalized_no,
         )
         if db.scalar(conflict_stmt):
             raise AppError(
@@ -96,10 +101,9 @@ class RequirementService:
 
         # 自动扫描绑定已在库中的 Git Commit
         from testweave.modules.repositories.matcher import MatcherService
-        try:
+
+        with contextlib.suppress(Exception):
             MatcherService.match_single_requirement(db, project_id, req)
-        except Exception:
-            pass
 
         # 记录审计日志
         AuditService.log_event(
@@ -149,7 +153,7 @@ class RequirementService:
             conflict_stmt = select(Requirement).where(
                 Requirement.project_id == project_id,
                 Requirement.requirement_no_normalized == new_no_normalized,
-                Requirement.id != requirement_id
+                Requirement.id != requirement_id,
             )
             if db.scalar(conflict_stmt):
                 raise AppError(
@@ -191,10 +195,9 @@ class RequirementService:
         # 如果单号发生变化，触发重新寻找并绑定匹配已有 Git Commits
         if new_no_normalized != old_no_normalized:
             from testweave.modules.repositories.matcher import MatcherService
-            try:
+
+            with contextlib.suppress(Exception):
                 MatcherService.match_single_requirement(db, project_id, req)
-            except Exception:
-                pass
 
         AuditService.log_event(
             db,
@@ -219,21 +222,25 @@ class RequirementService:
     ) -> None:
         # 验证需求存在性
         req = RequirementService.get_requirement_by_id(db, project_id, requirement_id)
-        
+
         # 验证版本存在性
-        version_stmt = select(Version).where(Version.id == version_id, Version.project_id == project_id)
+        version_stmt = select(Version).where(
+            Version.id == version_id, Version.project_id == project_id
+        )
         version = db.scalar(version_stmt)
         if not version:
             raise AppError(code="VERSION_NOT_FOUND", message="版本不存在", status_code=404)
 
         # 归档版本禁止修改需求范围
         if version.status == "ARCHIVED":
-            raise AppError(code="VERSION_ARCHIVED", message="版本已归档，不允许修改其需求范围", status_code=400)
+            raise AppError(
+                code="VERSION_ARCHIVED", message="版本已归档，不允许修改其需求范围", status_code=400
+            )
 
         # 检查是否已关联
         link_stmt = select(VersionRequirement).where(
             VersionRequirement.version_id == version_id,
-            VersionRequirement.requirement_id == requirement_id
+            VersionRequirement.requirement_id == requirement_id,
         )
         if db.scalar(link_stmt):
             return
@@ -266,19 +273,23 @@ class RequirementService:
         req = RequirementService.get_requirement_by_id(db, project_id, requirement_id)
 
         # 验证版本
-        version_stmt = select(Version).where(Version.id == version_id, Version.project_id == project_id)
+        version_stmt = select(Version).where(
+            Version.id == version_id, Version.project_id == project_id
+        )
         version = db.scalar(version_stmt)
         if not version:
             raise AppError(code="VERSION_NOT_FOUND", message="版本不存在", status_code=404)
 
         # 归档版本禁止解绑需求
         if version.status == "ARCHIVED":
-            raise AppError(code="VERSION_ARCHIVED", message="版本已归档，不允许修改其需求范围", status_code=400)
+            raise AppError(
+                code="VERSION_ARCHIVED", message="版本已归档，不允许修改其需求范围", status_code=400
+            )
 
         # 删除关联
         db.query(VersionRequirement).filter(
             VersionRequirement.version_id == version_id,
-            VersionRequirement.requirement_id == requirement_id
+            VersionRequirement.requirement_id == requirement_id,
         ).delete()
         db.flush()
 

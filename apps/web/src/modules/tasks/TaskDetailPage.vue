@@ -22,7 +22,7 @@
           <button
             v-if="task.status === 'DRAFT'"
             class="btn btn-primary btn-glow"
-            @click="handleTransition('READY')"
+            @click="openTransitionModal('READY')"
           >
             提交至待开始 (READY)
           </button>
@@ -31,7 +31,7 @@
           <button
             v-if="task.status === 'READY'"
             class="btn btn-indigo"
-            @click="handleTransition('IN_PROGRESS')"
+            @click="openTransitionModal('IN_PROGRESS')"
           >
             开始执行 (IN_PROGRESS)
           </button>
@@ -184,7 +184,9 @@
               <div class="linked-requirement-display">
                 <div class="req-content" v-if="linkedRequirements.length > 0">
                   <span class="req-badge">
-                    {{ linkedRequirements[0].requirement_no || linkedRequirements[0].requirementNo }}
+                    {{
+                      linkedRequirements[0].requirement_no || linkedRequirements[0].requirementNo
+                    }}
                   </span>
                   <span class="req-title">{{ linkedRequirements[0].title }}</span>
                 </div>
@@ -255,7 +257,7 @@
           </div>
           <div class="console-body">
             <!-- 用例编写大卡片 -->
-            <div class="action-card edit-cases" @click="goToCaseWriting">
+            <div class="action-card edit-cases" v-if="task.taskType === 'CASE_DESIGN'" @click="goToCaseWriting">
               <div class="card-icon">📊</div>
               <div class="card-info">
                 <h4>用例编写</h4>
@@ -265,7 +267,7 @@
             </div>
 
             <!-- 脑图设计大卡片 -->
-            <div class="action-card mindmap" @click="goToMindmap">
+            <div class="action-card mindmap" v-if="task.taskType === 'CASE_DESIGN'" @click="goToMindmap">
               <div class="card-icon">🧠</div>
               <div class="card-info">
                 <h4>脑图设计</h4>
@@ -275,11 +277,23 @@
             </div>
 
             <!-- AI用例设计大卡片 -->
-            <div class="action-card ai-design" @click="activeConsoleTab('ai')">
+            <div class="action-card ai-design" v-if="task.taskType === 'CASE_DESIGN'" @click="goToAiTestDesign">
               <div class="card-icon">✨</div>
               <div class="card-info">
-                <h4>AI 用例生成</h4>
-                <p>启动 M12 大模型算力，智能拆解需求测试树并一键生成候选用例。</p>
+                <h4>AI 测试设计</h4>
+                <p>从需求分析到测试点、测试用例与评审，按人工确认门禁保存完整生成链。</p>
+              </div>
+              <span class="go-arrow">→</span>
+            </div>
+            <div
+              v-if="task.taskType === 'TEST_EXECUTION'"
+              class="action-card execution"
+              @click="goToExecution"
+            >
+              <div class="card-icon">🧪</div>
+              <div class="card-info">
+                <h4>测试执行工作台</h4>
+                <p>进入执行工作台，逐条记录用例执行结果、上传证据并批量通过。</p>
               </div>
               <span class="go-arrow">→</span>
             </div>
@@ -313,7 +327,8 @@
                   <div class="node-time">{{ formatDatetime(a.createdAt) }}</div>
                   <div class="node-content">
                     <div class="node-title">
-                      <span class="node-actor">{{ a.actorName || "系统" }}</span>:
+                      <span class="node-actor">{{ a.actorName || "系统" }}</span
+                      >:
                       <span class="node-flow"
                         >{{ formatStatus(a.fromStatus) }} → {{ formatStatus(a.toStatus) }}</span
                       >
@@ -329,21 +344,19 @@
               </div>
             </div>
 
-            <!-- 页签 2: AI 进度占位 -->
+            <!-- 页签 2: AI 测试设计入口 -->
             <div v-if="currentTab === 'ai'" class="tab-pane">
               <div class="ai-glow-card">
                 <div class="ai-glow-header">
                   <span class="ai-sparkle">✨</span>
-                  <h4>AI 智能推荐就绪</h4>
+                  <h4>AI 测试设计工作台</h4>
                 </div>
                 <p class="ai-desc">
-                  已与 M12/M13 算力平台打通。等待导入正式测试需求或脑图树大纲分析即可激活用例生成。
+                  进入独立工作台查看真实运行状态，并继续这条任务下尚未完成的生成记录。
                 </p>
-
-                <div class="ai-scanning-animation">
-                  <div class="scanner-bar"></div>
-                  <div class="grid-mesh"></div>
-                </div>
+                <button type="button" class="btn btn-primary" @click="goToAiTestDesign">
+                  打开工作台
+                </button>
               </div>
             </div>
           </div>
@@ -638,6 +651,18 @@ function goToMindmap() {
   router.push(`/projects/${projectId.value}/test-tasks/${task.value.id}/mindmap`);
 }
 
+function goToAiTestDesign() {
+  if (!task.value) return;
+  router.push(
+    `/projects/${projectId.value}/test-tasks/${task.value.id}/ai-design/requirement-analysis`,
+  );
+}
+
+function goToExecution() {
+  if (!task.value) return;
+  router.push(`/projects/${projectId.value}/test-tasks/${task.value.id}/execution`);
+}
+
 function activeConsoleTab(tab: string) {
   currentTab.value = tab;
 }
@@ -647,7 +672,7 @@ const fetchLinkedRequirements = async () => {
   try {
     const list = await apiClient.get(
       `/api/v1/projects/${projectId.value}/test-tasks/${taskId.value}/requirements`,
-      (data) => data as Requirement[]
+      (data) => data as Requirement[],
     );
     linkedRequirements.value = list;
   } catch (err) {
@@ -675,7 +700,7 @@ const openLinkReqModal = async () => {
     // 1. 获取全量未归档需求
     const reqs = await apiClient.get(
       `/api/v1/projects/${projectId.value}/requirements`,
-      (data) => data as Requirement[]
+      (data) => data as Requirement[],
     );
     allRequirements.value = reqs.filter((r) => r.status !== "ARCHIVED");
 
@@ -706,7 +731,7 @@ const persistLinkRequirements = async (force: boolean) => {
 
     const res = await apiClient.put(
       `/api/v1/projects/${projectId.value}/test-tasks/${taskId.value}/requirements`,
-      payload
+      payload,
     );
 
     if (res.data && res.data.warnings && res.data.warnings.length > 0 && !force) {
@@ -737,6 +762,7 @@ const openTransitionModal = (targetStatus: string) => {
   transitionModalVisible.value = false;
   executeTransitionDirectlyCheck();
 };
+const handleTransition = openTransitionModal;
 
 const closeTransitionModal = () => {
   transitionModalVisible.value = false;
@@ -762,10 +788,13 @@ const executeTransitionDirectlyCheck = () => {
 };
 
 const executeTransitionDirectly = async (status: string) => {
+  if (!task.value) return;
   try {
-    await testTasksApi.transition(projectId.value, taskId.value, {
-      toStatus: status,
+    const updated = await testTasksApi.transition(projectId.value, taskId.value, {
+      targetStatus: status,
+      rowVersion: task.value.rowVersion,
     });
+    task.value = updated;
     alert("状态变更成功！");
     fetchDetailData();
   } catch (err: any) {
@@ -774,6 +803,7 @@ const executeTransitionDirectly = async (status: string) => {
 };
 
 const executeTransition = async () => {
+  if (!task.value) return;
   transmitting.value = true;
   transError.value = "";
 
@@ -788,15 +818,17 @@ const executeTransition = async () => {
     }
 
     const payload: any = {
-      toStatus: actualStatus,
+      targetStatus: actualStatus,
       reasonText: transForm.reasonText.trim(),
+      rowVersion: task.value.rowVersion,
     };
 
     if (transForm.reasonRequired) {
       payload.reasonCode = transForm.reasonCode;
     }
 
-    await testTasksApi.transition(projectId.value, taskId.value, payload);
+    const updated = await testTasksApi.transition(projectId.value, taskId.value, payload);
+    task.value = updated;
     closeTransitionModal();
     fetchDetailData();
     alert("状态变更成功！");
@@ -929,13 +961,41 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.status-badge.draft { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
-.status-badge.ready { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
-.status-badge.in_progress { background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
-.status-badge.blocked { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-.status-badge.completed { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-.status-badge.cancelled { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
-.status-badge.archived { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
+.status-badge.draft {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+.status-badge.ready {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+.status-badge.in_progress {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+.status-badge.blocked {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.status-badge.completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.status-badge.cancelled {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+.status-badge.archived {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
 
 .detail-layout {
   display: flex;
@@ -1016,7 +1076,8 @@ onMounted(() => {
   gap: 16px;
 }
 
-.form-control, .form-select {
+.form-control,
+.form-select {
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
@@ -1027,7 +1088,8 @@ onMounted(() => {
   transition: all 0.2s ease;
 }
 
-.form-control:focus, .form-select:focus {
+.form-control:focus,
+.form-select:focus {
   outline: none;
   border-color: #38bdf8;
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15);
@@ -1357,8 +1419,9 @@ onMounted(() => {
 .grid-mesh {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px);
   background-size: 10px 10px;
 }
 
@@ -1397,17 +1460,46 @@ onMounted(() => {
   transition: all 0.2s ease;
 }
 
-.btn-primary { background: #0284c7; color: #fff; }
-.btn-primary:hover { background: #0369a1; }
-.btn-indigo { background: #4f46e5; color: #fff; }
-.btn-indigo:hover { background: #4338ca; }
-.btn-emerald { background: #059669; color: #fff; }
-.btn-emerald:hover { background: #047857; }
-.btn-warning { background: #d97706; color: #fff; }
-.btn-warning:hover { background: #b45309; }
-.btn-secondary { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; }
-.btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
-.btn-sm { font-size: 11.5px; padding: 4px 10px; }
+.btn-primary {
+  background: #0284c7;
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #0369a1;
+}
+.btn-indigo {
+  background: #4f46e5;
+  color: #fff;
+}
+.btn-indigo:hover {
+  background: #4338ca;
+}
+.btn-emerald {
+  background: #059669;
+  color: #fff;
+}
+.btn-emerald:hover {
+  background: #047857;
+}
+.btn-warning {
+  background: #d97706;
+  color: #fff;
+}
+.btn-warning:hover {
+  background: #b45309;
+}
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.btn-sm {
+  font-size: 11.5px;
+  padding: 4px 10px;
+}
 
 .btn-glow {
   box-shadow: 0 0 12px rgba(2, 132, 199, 0.35);
@@ -1530,9 +1622,17 @@ onMounted(() => {
   margin-top: 10px;
 }
 
-.btn-red { background: #dc2626; color: #fff; }
-.btn-red:hover { background: #b91c1c; }
-.class-red { background: #ef4444; color: #fff; }
+.btn-red {
+  background: #dc2626;
+  color: #fff;
+}
+.btn-red:hover {
+  background: #b91c1c;
+}
+.class-red {
+  background: #ef4444;
+  color: #fff;
+}
 
 .info-alert {
   padding: 10px;
@@ -1570,12 +1670,19 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes scan {
-  0%, 100% { top: 0; }
-  50% { top: 46px; }
+  0%,
+  100% {
+    top: 0;
+  }
+  50% {
+    top: 46px;
+  }
 }
 
 @media (max-width: 1024px) {

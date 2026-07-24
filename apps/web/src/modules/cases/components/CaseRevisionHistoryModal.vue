@@ -16,7 +16,10 @@
               <span class="rev-time">{{ formatDate(rev.createdAt) }}</span>
             </div>
             <div class="rev-hash">快照 Hash: {{ rev.snapshotHash.substring(0, 16) }}...</div>
-            <div v-if="rev.changeSummary && Object.keys(rev.changeSummary).length" class="rev-summary">
+            <div
+              v-if="rev.changeSummary && Object.keys(rev.changeSummary).length"
+              class="rev-summary"
+            >
               变更信息: {{ JSON.stringify(rev.changeSummary) }}
             </div>
           </div>
@@ -54,7 +57,7 @@ watch(
         loading.value = false;
       }
     }
-  }
+  },
 );
 
 function formatDate(isoStr: string) {

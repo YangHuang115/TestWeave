@@ -1,20 +1,21 @@
-import os
-import uuid
 import hashlib
+import os
 import tempfile
+import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import AsyncIterator, Any
+
 import anyio
 from fastapi import UploadFile
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from testweave.core.config import get_settings
 from testweave.core.errors import AppError
 from testweave.db.models import RequirementAttachment
-from testweave.infrastructure.storage import LocalStorageProvider, DocxSafetyFilter
-from testweave.modules.requirements.service import RequirementService
+from testweave.infrastructure.storage import DocxSafetyFilter, LocalStorageProvider
 from testweave.modules.audit.service import AuditService
+from testweave.modules.requirements.service import RequirementService
 
 settings = get_settings()
 storage_provider = LocalStorageProvider(settings.storage_local_dir)
@@ -32,7 +33,11 @@ class AttachmentService:
     ) -> RequirementAttachment:
         filename = file.filename or ""
         if not filename.lower().endswith(".docx"):
-            raise AppError(code="INVALID_FILE_TYPE", message="仅允许上传 Word (.docx) 格式的附件", status_code=400)
+            raise AppError(
+                code="INVALID_FILE_TYPE",
+                message="仅允许上传 Word (.docx) 格式的附件",
+                status_code=400,
+            )
 
         # 验证隔离性
         RequirementService.get_requirement_by_id(db, project_id, requirement_id)
@@ -53,7 +58,11 @@ class AttachmentService:
                         break
                     written_bytes += len(chunk)
                     if written_bytes > max_bytes:
-                        raise AppError(code="FILE_SIZE_LIMIT_EXCEEDED", message="文件大小超过 20MB 限制", status_code=400)
+                        raise AppError(
+                            code="FILE_SIZE_LIMIT_EXCEEDED",
+                            message="文件大小超过 20MB 限制",
+                            status_code=400,
+                        )
                     sha256_hash.update(chunk)
                     await f.write(chunk)
 
@@ -83,7 +92,8 @@ class AttachmentService:
             project_id=uuid.UUID(project_id),
             requirement_id=uuid.UUID(requirement_id),
             original_filename=filename,
-            content_type=file.content_type or "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            content_type=file.content_type
+            or "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             size_bytes=written_bytes,
             sha256=sha256_hash.hexdigest(),
             storage_key=storage_key,
@@ -118,11 +128,21 @@ class AttachmentService:
     ) -> tuple[AsyncIterator[bytes], str, str]:
         # 查找
         attachment = db.get(RequirementAttachment, uuid.UUID(attachment_id))
-        if not attachment or str(attachment.project_id) != project_id or str(attachment.requirement_id) != requirement_id:
-            raise AppError(code="ATTACHMENT_NOT_FOUND", message="附件不存在或无权访问", status_code=404)
+        if (
+            not attachment
+            or str(attachment.project_id) != project_id
+            or str(attachment.requirement_id) != requirement_id
+        ):
+            raise AppError(
+                code="ATTACHMENT_NOT_FOUND", message="附件不存在或无权访问", status_code=404
+            )
 
         if attachment.status != "ACTIVE":
-            raise AppError(code="ATTACHMENT_ARCHIVED", message="该附件已被归档删除，不允许下载", status_code=400)
+            raise AppError(
+                code="ATTACHMENT_ARCHIVED",
+                message="该附件已被归档删除，不允许下载",
+                status_code=400,
+            )
 
         # 审计日志
         AuditService.log_event(
@@ -150,8 +170,14 @@ class AttachmentService:
     ) -> None:
         # 查找
         attachment = db.get(RequirementAttachment, uuid.UUID(attachment_id))
-        if not attachment or str(attachment.project_id) != project_id or str(attachment.requirement_id) != requirement_id:
-            raise AppError(code="ATTACHMENT_NOT_FOUND", message="附件不存在或无权访问", status_code=404)
+        if (
+            not attachment
+            or str(attachment.project_id) != project_id
+            or str(attachment.requirement_id) != requirement_id
+        ):
+            raise AppError(
+                code="ATTACHMENT_NOT_FOUND", message="附件不存在或无权访问", status_code=404
+            )
 
         if attachment.status == "ARCHIVED":
             return
@@ -179,9 +205,13 @@ class AttachmentService:
         project_id: str,
         requirement_id: str,
     ) -> list[RequirementAttachment]:
-        stmt = select(RequirementAttachment).where(
-            RequirementAttachment.project_id == uuid.UUID(str(project_id)),
-            RequirementAttachment.requirement_id == uuid.UUID(str(requirement_id)),
-            RequirementAttachment.status == "ACTIVE"
-        ).order_by(RequirementAttachment.uploaded_at.desc())
+        stmt = (
+            select(RequirementAttachment)
+            .where(
+                RequirementAttachment.project_id == uuid.UUID(str(project_id)),
+                RequirementAttachment.requirement_id == uuid.UUID(str(requirement_id)),
+                RequirementAttachment.status == "ACTIVE",
+            )
+            .order_by(RequirementAttachment.uploaded_at.desc())
+        )
         return list(db.scalars(stmt).all())

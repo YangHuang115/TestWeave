@@ -35,7 +35,7 @@
         <div v-if="activeSessionCount > 0" class="draft-badge">
           <span>📝 {{ activeSessionCount }} 条用例有暂存草稿</span>
           <button class="btn-finalize-all" :disabled="saving" @click="finalizeAllActiveSessions">
-            {{ saving ? '发布中...' : '提交发布新版本' }}
+            {{ saving ? "发布中..." : "提交发布新版本" }}
           </button>
         </div>
 
@@ -68,7 +68,9 @@
             <td colspan="10" class="td-state-msg">正在加载用例数据...</td>
           </tr>
           <tr v-else-if="cases.length === 0 && draftRows.length === 0">
-            <td colspan="10" class="td-state-msg">当前暂无测试用例，点击“新增用例行”开始表格式编写。</td>
+            <td colspan="10" class="td-state-msg">
+              当前暂无测试用例，点击“新增用例行”开始表格式编写。
+            </td>
           </tr>
 
           <!-- 正式用例列表 (单元格直编) -->
@@ -119,7 +121,7 @@
                 rows="2"
                 @blur="handleCellBlur(row)"
               ></textarea>
-              <span v-else class="cell-text text-pre">{{ row.precondition || '-' }}</span>
+              <span v-else class="cell-text text-pre">{{ row.precondition || "-" }}</span>
             </td>
 
             <!-- 执行步骤 (多步骤编辑器) -->
@@ -131,17 +133,13 @@
                   class="step-edit-item"
                 >
                   <span class="step-num">{{ idx + 1 }}.</span>
-                  <input
-                    v-model="st.action"
-                    placeholder="输入步骤描述"
-                    class="step-input"
-                  />
+                  <input v-model="st.action" placeholder="输入步骤描述" class="step-input" />
                 </div>
                 <button class="btn-step-add" @click.stop="addStep(row.id)">+ 添加步骤</button>
                 <button class="btn-step-save" @click.stop="handleCellBlur(row)">完成编辑</button>
               </div>
               <div v-else class="steps-preview">
-                <div v-for="(st, idx) in (row.steps || [])" :key="idx" class="step-row">
+                <div v-for="(st, idx) in row.steps || []" :key="idx" class="step-row">
                   <span class="step-num">{{ idx + 1 }}.</span>
                   <span>{{ st.action }}</span>
                 </div>
@@ -172,7 +170,7 @@
                 </div>
               </div>
               <div v-else class="steps-preview">
-                <div v-for="(st, idx) in (row.steps || [])" :key="idx" class="step-row">
+                <div v-for="(st, idx) in row.steps || []" :key="idx" class="step-row">
                   <span class="step-num">{{ idx + 1 }}.</span>
                   <span>{{ st.expectedResult }}</span>
                 </div>
@@ -262,12 +260,7 @@
                 <div v-for="(st, sIdx) in dRow.steps" :key="sIdx" class="step-edit-item">
                   <span class="step-num">{{ sIdx + 1 }}.</span>
                   <input v-model="st.expectedResult" placeholder="预期结果" class="step-input" />
-                  <button
-                    class="btn-step-del"
-                    @click="removeDraftRowStep(index, sIdx)"
-                  >
-                    ×
-                  </button>
+                  <button class="btn-step-del" @click="removeDraftRowStep(index, sIdx)">×</button>
                 </div>
               </div>
             </td>
@@ -692,16 +685,37 @@ onMounted(fetchCases);
   }
 }
 
-.col-check { width: 40px; text-align: center; }
-.col-no { width: 110px; }
-.col-title { width: 220px; }
-.col-modules { width: 140px; }
-.col-pre { width: 180px; }
-.col-steps { width: 320px; }
-.col-expected { width: 320px; }
-.col-prio { width: 90px; }
-.col-type { width: 100px; }
-.col-acts { width: 90px; }
+.col-check {
+  width: 40px;
+  text-align: center;
+}
+.col-no {
+  width: 110px;
+}
+.col-title {
+  width: 220px;
+}
+.col-modules {
+  width: 140px;
+}
+.col-pre {
+  width: 180px;
+}
+.col-steps {
+  width: 320px;
+}
+.col-expected {
+  width: 320px;
+}
+.col-prio {
+  width: 90px;
+}
+.col-type {
+  width: 100px;
+}
+.col-acts {
+  width: 90px;
+}
 
 .cell-editable {
   cursor: pointer;
@@ -724,12 +738,24 @@ onMounted(fetchCases);
   margin-left: 4px;
 }
 
-.text-mono { font-family: monospace; font-size: 12px; }
-.text-muted { color: #64748b; }
-.cell-text { display: block; line-height: 1.5; }
-.cell-pre { white-space: pre-wrap; }
+.text-mono {
+  font-family: monospace;
+  font-size: 12px;
+}
+.text-muted {
+  color: #64748b;
+}
+.cell-text {
+  display: block;
+  line-height: 1.5;
+}
+.cell-pre {
+  white-space: pre-wrap;
+}
 
-.cell-input, .cell-select, .cell-textarea {
+.cell-input,
+.cell-select,
+.cell-textarea {
   width: 100%;
   background: rgba(15, 23, 42, 0.9);
   border: 1px solid #38bdf8;
@@ -778,7 +804,8 @@ onMounted(fetchCases);
   font-size: 12px;
 }
 
-.btn-step-add, .btn-step-save {
+.btn-step-add,
+.btn-step-save {
   background: rgba(255, 255, 255, 0.08);
   border: none;
   color: #38bdf8;
@@ -803,10 +830,22 @@ onMounted(fetchCases);
   border-radius: 4px;
   font-weight: 600;
 
-  &.URGENT { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-  &.HIGH { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
-  &.MEDIUM { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
-  &.LOW { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+  &.URGENT {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+  }
+  &.HIGH {
+    background: rgba(249, 115, 22, 0.2);
+    color: #fb923c;
+  }
+  &.MEDIUM {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+  }
+  &.LOW {
+    background: rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+  }
 }
 
 .type-tag {

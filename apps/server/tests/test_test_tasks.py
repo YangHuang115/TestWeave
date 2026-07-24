@@ -545,9 +545,13 @@ def test_transition_matrix(db: Session, task_test_context: dict) -> None:
     )
     db.commit()
     assert task.status == "BLOCKED"
-    
+
     # 验证有未解决阻塞
-    block_rec = db.scalar(select(TestTaskBlockage).where(TestTaskBlockage.task_id == task.id, TestTaskBlockage.resolved_at.is_(None)))
+    block_rec = db.scalar(
+        select(TestTaskBlockage).where(
+            TestTaskBlockage.task_id == task.id, TestTaskBlockage.resolved_at.is_(None)
+        )
+    )
     assert block_rec is not None
     assert block_rec.reason_code == "REQUIREMENT_UNCLEAR"
 
@@ -580,9 +584,16 @@ def test_transition_matrix(db: Session, task_test_context: dict) -> None:
     )
     db.commit()
     assert task.status == "IN_PROGRESS"
-    
+
     # 验证阻塞已被解决
-    assert db.scalar(select(TestTaskBlockage).where(TestTaskBlockage.task_id == task.id, TestTaskBlockage.resolved_at.is_(None))) is None
+    assert (
+        db.scalar(
+            select(TestTaskBlockage).where(
+                TestTaskBlockage.task_id == task.id, TestTaskBlockage.resolved_at.is_(None)
+            )
+        )
+        is None
+    )
 
     # 6. 完成任务
     task = TestTaskService.transition_status(

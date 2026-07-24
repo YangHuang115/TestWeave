@@ -115,16 +115,21 @@ const menuItems = [
   { path: "/cases", label: "用例库", icon: "🗂️" },
   { path: "/defects", label: "缺陷", icon: "🐛" },
   { path: "/reports", label: "报告", icon: "📈" },
-  { path: "/agent", label: "Agent 中心", icon: "🤖" },
+  { path: "/agent", label: "AI 能力中心", icon: "🤖", requirePermission: "agent.use" },
   { path: "/repository-settings", label: "仓库配置", icon: "📦", requireAdmin: true },
   { path: "/admin", label: "管理员设置", icon: "⚙️", requireAdmin: true },
 ];
 
 const visibleMenuItems = computed(() => {
   return menuItems.filter((item) => {
-    if (!item.requireAdmin) return true;
-    // 只有项目管理员或者系统管理员才可以显示“管理员设置”
-    return projectStore.memberRole === "project_admin" || authStore.currentUser?.is_system_admin;
+    if (authStore.currentUser?.is_system_admin) return true;
+    if (item.requireAdmin) {
+      return projectStore.memberRole === "project_admin";
+    }
+    if (item.requirePermission) {
+      return projectStore.hasPermission(item.requirePermission);
+    }
+    return true;
   });
 });
 

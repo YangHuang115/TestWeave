@@ -131,6 +131,7 @@ class AuthService:
         if now - last_accessed_at > timedelta(minutes=10):
             from sqlalchemy import update
             from sqlalchemy.orm import Session as SqlalchemySession
+
             if db.bind:
                 with SqlalchemySession(db.bind) as temp_db:
                     try:

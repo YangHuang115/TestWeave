@@ -94,7 +94,7 @@ export class ApiClient {
 
   async get<T>(
     path: string,
-    decoder: ResponseDecoder<T>,
+    decoder?: ResponseDecoder<T>,
     init: Omit<RequestInit, "method"> = {},
   ): Promise<T> {
     return this.request<T>(path, decoder, { ...init, method: "GET" });
@@ -102,61 +102,77 @@ export class ApiClient {
 
   async post<T>(
     path: string,
-    decoder: ResponseDecoder<T>,
+    decoder?: ResponseDecoder<T>,
     body?: unknown,
     init: Omit<RequestInit, "method" | "body"> = {},
   ): Promise<T> {
     const bodyInit: RequestInit = { ...init, method: "POST" };
     if (body !== undefined) {
-      bodyInit.body = JSON.stringify(body);
-      const headers = new Headers(bodyInit.headers);
-      headers.set("Content-Type", "application/json");
-      bodyInit.headers = headers;
+      if (body instanceof FormData) {
+        bodyInit.body = body;
+      } else {
+        bodyInit.body = JSON.stringify(body);
+        const headers = new Headers(bodyInit.headers);
+        headers.set("Content-Type", "application/json");
+        bodyInit.headers = headers;
+      }
     }
     return this.request<T>(path, decoder, bodyInit);
   }
 
   async patch<T>(
     path: string,
-    decoder: ResponseDecoder<T>,
+    decoder?: ResponseDecoder<T>,
     body?: unknown,
     init: Omit<RequestInit, "method" | "body"> = {},
   ): Promise<T> {
     const bodyInit: RequestInit = { ...init, method: "PATCH" };
     if (body !== undefined) {
-      bodyInit.body = JSON.stringify(body);
-      const headers = new Headers(bodyInit.headers);
-      headers.set("Content-Type", "application/json");
-      bodyInit.headers = headers;
+      if (body instanceof FormData) {
+        bodyInit.body = body;
+      } else {
+        bodyInit.body = JSON.stringify(body);
+        const headers = new Headers(bodyInit.headers);
+        headers.set("Content-Type", "application/json");
+        bodyInit.headers = headers;
+      }
     }
     return this.request<T>(path, decoder, bodyInit);
   }
 
   async put<T>(
     path: string,
-    decoder: ResponseDecoder<T>,
+    decoder?: ResponseDecoder<T>,
     body?: unknown,
     init: Omit<RequestInit, "method" | "body"> = {},
   ): Promise<T> {
     const bodyInit: RequestInit = { ...init, method: "PUT" };
     if (body !== undefined) {
-      bodyInit.body = JSON.stringify(body);
-      const headers = new Headers(bodyInit.headers);
-      headers.set("Content-Type", "application/json");
-      bodyInit.headers = headers;
+      if (body instanceof FormData) {
+        bodyInit.body = body;
+      } else {
+        bodyInit.body = JSON.stringify(body);
+        const headers = new Headers(bodyInit.headers);
+        headers.set("Content-Type", "application/json");
+        bodyInit.headers = headers;
+      }
     }
     return this.request<T>(path, decoder, bodyInit);
   }
 
   async delete<T>(
     path: string,
-    decoder: ResponseDecoder<T>,
+    decoder?: ResponseDecoder<T>,
     init: Omit<RequestInit, "method"> = {},
   ): Promise<T> {
     return this.request<T>(path, decoder, { ...init, method: "DELETE" });
   }
 
-  async request<T>(path: string, decoder: ResponseDecoder<T>, init: RequestInit = {}): Promise<T> {
+  async request<T>(
+    path: string,
+    decoder?: ResponseDecoder<T>,
+    init: RequestInit = {},
+  ): Promise<T> {
     const requestId = this.requestIdFactory();
     if (init.signal?.aborted) {
       throw new ApiError({
@@ -219,7 +235,7 @@ export class ApiClient {
         });
       }
       try {
-        return decoder(body);
+        return decoder ? decoder(body) : (body as T);
       } catch {
         throw new ApiError({
           code: "INVALID_RESPONSE",

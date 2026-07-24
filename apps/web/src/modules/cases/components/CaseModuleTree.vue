@@ -40,7 +40,7 @@
     <!-- 创建 / 修改模块弹窗 -->
     <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
       <div class="modal-content">
-        <h3>{{ isEditing ? '重命名模块' : '新建子模块' }}</h3>
+        <h3>{{ isEditing ? "重命名模块" : "新建子模块" }}</h3>
         <div class="form-group">
           <label>模块名称</label>
           <input
@@ -53,13 +53,12 @@
           />
         </div>
 
-
         <div v-if="errorMsg" class="error-banner">{{ errorMsg }}</div>
 
         <div class="modal-actions">
           <button class="btn-cancel" @click="closeModal">取消</button>
           <button class="btn-confirm" :disabled="submitting" @click="submitForm">
-            {{ submitting ? '保存中...' : '确定' }}
+            {{ submitting ? "保存中..." : "确定" }}
           </button>
         </div>
       </div>
@@ -197,7 +196,7 @@ const TreeNodeItem = defineComponent({
               ? h(
                   "span",
                   { class: ["arrow-icon", { expanded: expanded.value }], onClick: toggleExpand },
-                  "▶"
+                  "▶",
                 )
               : h("span", { class: "arrow-placeholder" }),
             h("span", { class: "node-icon" }, "📂"),
@@ -213,7 +212,7 @@ const TreeNodeItem = defineComponent({
                     itemEmit("create-child", p.node.id);
                   },
                 },
-                "+"
+                "+",
               ),
               h(
                 "button",
@@ -225,7 +224,7 @@ const TreeNodeItem = defineComponent({
                     itemEmit("rename", p.node);
                   },
                 },
-                "✏️"
+                "✏️",
               ),
               h(
                 "button",
@@ -237,10 +236,10 @@ const TreeNodeItem = defineComponent({
                     itemEmit("archive", p.node);
                   },
                 },
-                "🗑️"
+                "🗑️",
               ),
             ]),
-          ]
+          ],
         ),
         hasChildren && expanded.value
           ? h(
@@ -254,8 +253,8 @@ const TreeNodeItem = defineComponent({
                   onCreateChild: (id: string | null) => itemEmit("create-child", id),
                   onRename: (mod: CaseModuleNode) => itemEmit("rename", mod),
                   onArchive: (mod: CaseModuleNode) => itemEmit("archive", mod),
-                })
-              )
+                }),
+              ),
             )
           : null,
       ]);

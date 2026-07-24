@@ -5,6 +5,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 
 from testweave.core.config import Settings, get_settings
 from testweave.core.readiness import ReadinessFailure, SqlAlchemyReadinessProbe
@@ -45,7 +46,8 @@ def test_empty_database_upgrades_to_head_and_becomes_ready(monkeypatch: pytest.M
         with engine.connect() as connection:
             current_revision = MigrationContext.configure(connection).get_current_revision()
 
-        assert current_revision == "65482bc04697"
+        expected_head = ScriptDirectory.from_config(config).get_current_head()
+        assert current_revision == expected_head
         assert probe.check() == {"database": "ok", "migrations": "ok"}
 
     finally:

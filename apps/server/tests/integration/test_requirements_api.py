@@ -1,15 +1,15 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Any
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from testweave.modules.users.service import UserService
-from testweave.modules.projects.service import ProjectService
-from testweave.modules.versions.service import VersionService
-from testweave.modules.requirements.service import RequirementService
-from datetime import datetime, UTC
 from testweave.db.models import CodeRepository, GitCommit, RequirementCommitLink
+from testweave.modules.projects.service import ProjectService
+from testweave.modules.users.service import UserService
+from testweave.modules.versions.service import VersionService
 
 pytestmark = pytest.mark.integration
 
@@ -19,13 +19,25 @@ async def req_integration_context(client: AsyncClient, session: Session) -> dict
     """准备集成测试所需的用户、项目和版本，并建立不同角色的客户端 session cookies"""
     # 建立测试用户
     admin_user = UserService.create_user(
-        session, username="reqapiadmin", email="ra@tw.com", display_name="Req API Admin", password="pwd"
+        session,
+        username="reqapiadmin",
+        email="ra@tw.com",
+        display_name="Req API Admin",
+        password="pwd",
     )
     member_user = UserService.create_user(
-        session, username="reqapimember", email="rm@tw.com", display_name="Req API Member", password="pwd"
+        session,
+        username="reqapimember",
+        email="rm@tw.com",
+        display_name="Req API Member",
+        password="pwd",
     )
     guest_user = UserService.create_user(
-        session, username="reqapiguest", email="rg@tw.com", display_name="Req API Guest", password="pwd"
+        session,
+        username="reqapiguest",
+        email="rg@tw.com",
+        display_name="Req API Guest",
+        password="pwd",
     )
     session.commit()
 
@@ -89,7 +101,9 @@ async def req_integration_context(client: AsyncClient, session: Session) -> dict
 
 
 @pytest.mark.anyio
-async def test_requirement_api_lifecycle(client: AsyncClient, session: Session, req_integration_context: dict[str, Any]) -> None:
+async def test_requirement_api_lifecycle(
+    client: AsyncClient, session: Session, req_integration_context: dict[str, Any]
+) -> None:
     project = req_integration_context["project"]
     version = req_integration_context["version"]
     admin_session = req_integration_context["admin_session"]
@@ -186,7 +200,7 @@ async def test_requirement_api_lifecycle(client: AsyncClient, session: Session, 
         project_id=project.id,
         requirement_id=uuid.UUID(req_id),
         commit_id=commit.id,
-        matched_requirement_no="REQ-10001"
+        matched_requirement_no="REQ-10001",
     )
     session.add(commit_link)
     session.commit()

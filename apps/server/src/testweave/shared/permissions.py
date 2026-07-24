@@ -8,6 +8,10 @@ TASK_READ = "task.read"
 TASK_MANAGE = "task.manage"
 TEST_CASE_READ = "test_case.read"
 TEST_CASE_MANAGE = "test_case.manage"
+EXECUTION_READ = "execution.read"
+EXECUTION_MANAGE = "execution.manage"
+EXECUTION_RESULT_CREATE = "execution.result.create"
+EXECUTION_EVIDENCE_UPLOAD = "execution.evidence.upload"
 DEFECT_READ = "defect.read"
 DEFECT_MANAGE = "defect.manage"
 REPORT_READ = "report.read"
@@ -28,6 +32,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         TASK_MANAGE,
         TEST_CASE_READ,
         TEST_CASE_MANAGE,
+        EXECUTION_READ,
+        EXECUTION_MANAGE,
+        EXECUTION_RESULT_CREATE,
+        EXECUTION_EVIDENCE_UPLOAD,
         DEFECT_READ,
         DEFECT_MANAGE,
         REPORT_READ,
@@ -44,6 +52,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         TASK_MANAGE,
         TEST_CASE_READ,
         TEST_CASE_MANAGE,
+        EXECUTION_READ,
+        EXECUTION_MANAGE,
+        EXECUTION_RESULT_CREATE,
+        EXECUTION_EVIDENCE_UPLOAD,
         DEFECT_READ,
         DEFECT_MANAGE,
         REPORT_READ,
@@ -57,6 +69,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         TASK_MANAGE,
         TEST_CASE_READ,
         TEST_CASE_MANAGE,
+        EXECUTION_READ,
+        EXECUTION_MANAGE,
+        EXECUTION_RESULT_CREATE,
+        EXECUTION_EVIDENCE_UPLOAD,
         DEFECT_READ,
         DEFECT_MANAGE,
         REPORT_READ,

@@ -1,12 +1,11 @@
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
-from sqlalchemy import and_, desc, select, func
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
 from testweave.core.errors import AppError
-from testweave.db.models import Version, Project
+from testweave.db.models import Project, Version
 from testweave.modules.audit.service import AuditService
 
 
@@ -39,7 +38,7 @@ class VersionService:
 
         # 排序：按更新时间降序
         stmt = stmt.order_by(desc(Version.updated_at))
-        
+
         # 统计总数
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = db.scalar(count_stmt) or 0
@@ -147,10 +146,14 @@ class VersionService:
         """更新版本（含乐观锁校验与状态流转控制）"""
         version = VersionService.get_version(db, project_id, version_id)
         if not version:
-            raise AppError(code="VERSION_NOT_FOUND", message="版本不存在或不属于当前项目", status_code=404)
+            raise AppError(
+                code="VERSION_NOT_FOUND", message="版本不存在或不属于当前项目", status_code=404
+            )
 
         if version.status == "ARCHIVED":
-            raise AppError(code="VERSION_ARCHIVED", message="已归档版本处于只读状态，无法修改", status_code=403)
+            raise AppError(
+                code="VERSION_ARCHIVED", message="已归档版本处于只读状态，无法修改", status_code=403
+            )
 
         # 乐观锁校验
         if version.row_version != expected_row_version:
@@ -175,7 +178,7 @@ class VersionService:
             "TESTING": {"ACTIVE", "TESTING", "RELEASED", "ARCHIVED"},
             "RELEASED": {"RELEASED", "ARCHIVED"},
         }
-        
+
         if status not in valid_transitions.get(version.status, set()):
             raise AppError(
                 code="VERSION_STATUS_TRANSITION_INVALID",
@@ -217,7 +220,9 @@ class VersionService:
         """归档版本"""
         version = VersionService.get_version(db, project_id, version_id)
         if not version:
-            raise AppError(code="VERSION_NOT_FOUND", message="版本不存在或不属于当前项目", status_code=404)
+            raise AppError(
+                code="VERSION_NOT_FOUND", message="版本不存在或不属于当前项目", status_code=404
+            )
 
         if version.status == "ARCHIVED":
             return version
@@ -252,10 +257,14 @@ class VersionService:
         """从归档状态中恢复版本"""
         version = VersionService.get_version(db, project_id, version_id)
         if not version:
-            raise AppError(code="VERSION_NOT_FOUND", message="版本不存在或不属于当前项目", status_code=404)
+            raise AppError(
+                code="VERSION_NOT_FOUND", message="版本不存在或不属于当前项目", status_code=404
+            )
 
         if version.status != "ARCHIVED":
-            raise AppError(code="VERSION_NOT_ARCHIVED", message="版本未处于归档状态，无法恢复", status_code=422)
+            raise AppError(
+                code="VERSION_NOT_ARCHIVED", message="版本未处于归档状态，无法恢复", status_code=422
+            )
 
         restore_status = version.previous_status or "PLANNING"
         version.status = restore_status

@@ -7,6 +7,7 @@ from sqlalchemy import Engine
 
 from testweave.api.health import router as health_router
 from testweave.api.v1 import v1_router
+from testweave.api.v1.external_gateway import router as external_gateway_router
 from testweave.core.config import Settings, get_settings
 from testweave.core.errors import UnhandledExceptionMiddleware, register_exception_handlers
 from testweave.core.logging import configure_logging
@@ -68,6 +69,23 @@ def create_app(
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(v1_router)
+    app.include_router(external_gateway_router)
+
+    # 挂载 MCP (Model Context Protocol) 兼容端点
+    @app.get("/mcp", summary="MCP Protocol Server Info")
+    @app.get("/mcp/sse", summary="MCP Protocol SSE Stream")
+    async def mcp_server_info() -> dict:
+        return {
+            "status": "active",
+            "name": "TestWeave MCP Server",
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "resources": {},
+                "tools": {"listChanged": True},
+                "prompts": {},
+            },
+        }
+
     return app
 
 

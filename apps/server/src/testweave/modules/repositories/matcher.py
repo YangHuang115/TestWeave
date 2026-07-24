@@ -1,9 +1,10 @@
 import re
 import uuid
-from sqlalchemy.orm import Session
-from sqlalchemy import select, delete
 
-from testweave.db.models import Requirement, GitCommit, RequirementCommitLink
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+
+from testweave.db.models import GitCommit, Requirement, RequirementCommitLink
 from testweave.modules.requirements.service import normalize_requirement_no
 
 
@@ -28,8 +29,7 @@ class MatcherService:
 
         # 1. 批量查询 commits
         stmt_commits = select(GitCommit).where(
-            GitCommit.repository_id == uuid.UUID(str(repository_id)),
-            GitCommit.sha.in_(commit_shas)
+            GitCommit.repository_id == uuid.UUID(str(repository_id)), GitCommit.sha.in_(commit_shas)
         )
         commits = db.scalars(stmt_commits).all()
         if not commits:
@@ -37,8 +37,7 @@ class MatcherService:
 
         # 2. 拉取项目下所有未归档的需求（以建立内存 mapping 加速）
         stmt_reqs = select(Requirement).where(
-            Requirement.project_id == uuid.UUID(str(project_id)),
-            Requirement.status != "ARCHIVED"
+            Requirement.project_id == uuid.UUID(str(project_id)), Requirement.status != "ARCHIVED"
         )
         reqs = db.scalars(stmt_reqs).all()
         if not reqs:
@@ -53,15 +52,15 @@ class MatcherService:
             for tok in tokens:
                 if tok in req_map:
                     req = req_map[tok]
-                    
+
                     # 检查是否已有关联
                     stmt_exist = select(RequirementCommitLink).where(
                         RequirementCommitLink.requirement_id == req.id,
                         RequirementCommitLink.commit_id == c.id,
-                        RequirementCommitLink.status == "ACTIVE"
+                        RequirementCommitLink.status == "ACTIVE",
                     )
                     existing = db.scalar(stmt_exist)
-                    
+
                     if not existing:
                         link = RequirementCommitLink(
                             project_id=uuid.UUID(str(project_id)),
@@ -70,7 +69,7 @@ class MatcherService:
                             matched_requirement_no=req.requirement_no,
                             match_revision=1,
                             match_method="COMMIT_MESSAGE_EXACT_TOKEN",
-                            status="ACTIVE"
+                            status="ACTIVE",
                         )
                         db.add(link)
                         links_count += 1
@@ -82,42 +81,42 @@ class MatcherService:
     def rematch_project_requirements(cls, db: Session, project_id: str) -> int:
         """重新对项目下所有 ACTIVE 提交重新执行需求匹配扫描 (常用于手动触发或单号大范围修改)"""
         pid = uuid.UUID(str(project_id))
-        
+
         # 1. 物理删除已有所有的匹配链接
-        stmt_del = delete(RequirementCommitLink).where(
-            RequirementCommitLink.project_id == pid
-        )
+        stmt_del = delete(RequirementCommitLink).where(RequirementCommitLink.project_id == pid)
         db.execute(stmt_del)
         db.flush()
 
         # 2. 找出该项目下所有的仓库
         from testweave.modules.repositories.service import RepositoryService
+
         repo = RepositoryService.get_repository_by_project_id(db, project_id)
         if not repo:
             return 0
 
         # 3. 找出所有 ACTIVE 的 commits shas 并分批进行重新匹配
-        stmt_commits = select(GitCommit.sha).where(
-            GitCommit.repository_id == repo.id
-        )
+        stmt_commits = select(GitCommit.sha).where(GitCommit.repository_id == repo.id)
         shas = list(db.scalars(stmt_commits).all())
-        
+
         # 分批处理以防 memory 溢出
         batch_size = 500
         total_matched = 0
         for i in range(0, len(shas), batch_size):
-            batch = shas[i:i + batch_size]
+            batch = shas[i : i + batch_size]
             total_matched += cls.match_commits_to_requirements(db, project_id, str(repo.id), batch)
 
         return total_matched
 
     @classmethod
-    def match_single_requirement(cls, db: Session, project_id: str, requirement: Requirement) -> int:
+    def match_single_requirement(
+        cls, db: Session, project_id: str, requirement: Requirement
+    ) -> int:
         """为单条需求寻找并绑定已同步在库的历史 commits"""
         pid = uuid.UUID(str(project_id))
-        
+
         # 1. 找出该项目下所有的仓库
         from testweave.modules.repositories.service import RepositoryService
+
         repo = RepositoryService.get_repository_by_project_id(db, project_id)
         if not repo:
             return 0
@@ -125,7 +124,7 @@ class MatcherService:
         # 2. 批量查出该项目下可能相关的 commits
         stmt_commits = select(GitCommit).where(
             GitCommit.repository_id == repo.id,
-            GitCommit.message.ilike(f"%{requirement.requirement_no}%")
+            GitCommit.message.ilike(f"%{requirement.requirement_no}%"),
         )
         commits = db.scalars(stmt_commits).all()
         if not commits:
@@ -140,10 +139,10 @@ class MatcherService:
                 stmt_exist = select(RequirementCommitLink).where(
                     RequirementCommitLink.requirement_id == requirement.id,
                     RequirementCommitLink.commit_id == c.id,
-                    RequirementCommitLink.status == "ACTIVE"
+                    RequirementCommitLink.status == "ACTIVE",
                 )
                 existing = db.scalar(stmt_exist)
-                
+
                 if not existing:
                     link = RequirementCommitLink(
                         project_id=pid,
@@ -152,10 +151,10 @@ class MatcherService:
                         matched_requirement_no=requirement.requirement_no,
                         match_revision=1,
                         match_method="COMMIT_MESSAGE_EXACT_TOKEN",
-                        status="ACTIVE"
+                        status="ACTIVE",
                     )
                     db.add(link)
                     links_count += 1
-                    
+
         db.flush()
         return links_count

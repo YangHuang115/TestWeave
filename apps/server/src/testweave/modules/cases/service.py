@@ -458,6 +458,144 @@ class TestCaseService:
         return revision
 
     @staticmethod
+    def resolve_stable_revisions_for_source_task(
+        db: Session,
+        project_id: str,
+        source_design_task_id: str,
+        actor_id: str,
+    ) -> list[dict[str, Any]]:
+        """M06 集成合约：返回来源设计任务当前全部有效用例的稳定修订快照。
+
+        会 finalize 仍在 OPEN 的编辑会话以取得稳定修订；任意用例缺失稳定修订
+        或存在无法解决的编辑会话冲突时整体失败，不静默跳过。
+        """
+        proj_uuid = uuid.UUID(str(project_id))
+        task_uuid = uuid.UUID(str(source_design_task_id))
+
+        case_stmt = select(TestCase).where(
+            TestCase.project_id == proj_uuid,
+            TestCase.source_task_id == task_uuid,
+            TestCase.deleted_at.is_(None),
+        )
+        cases = db.scalars(case_stmt).all()
+        if not cases:
+            raise AppError(
+                code="EXECUTION_SOURCE_TASK_HAS_NO_CASES",
+                message="来源用例设计任务当前没有有效用例，无法创建执行任务",
+                status_code=400,
+            )
+
+        # 预取模块关系与模块，构建 modulePaths
+        case_ids = [c.id for c in cases]
+        rel_stmt = select(TestCaseModuleRelation).where(
+            TestCaseModuleRelation.case_id.in_(case_ids)
+        )
+        relations = db.scalars(rel_stmt).all()
+        module_ids = {r.module_id for r in relations}
+        mod_stmt = select(CaseModule).where(CaseModule.id.in_(module_ids))
+        modules = db.scalars(mod_stmt).all()
+        module_by_id = {m.id: m for m in modules}
+        case_modules: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for r in relations:
+            case_modules.setdefault(r.case_id, []).append(r.module_id)
+
+        def build_module_paths(mids: list[uuid.UUID]) -> list[str]:
+            paths: list[str] = []
+            for mid in mids:
+                m = module_by_id.get(mid)
+                if not m:
+                    continue
+                chain: list[str] = []
+                cur: CaseModule | None = m
+                seen: set[uuid.UUID] = set()
+                while cur is not None and cur.id not in seen:
+                    seen.add(cur.id)
+                    chain.append(cur.name)
+                    if cur.parent_id and cur.parent_id in module_by_id:
+                        cur = module_by_id[cur.parent_id]
+                    else:
+                        cur = None
+                chain.reverse()
+                paths.append(" / ".join(chain))
+            return paths
+
+        results: list[dict[str, Any]] = []
+        for case in cases:
+            if case.current_revision_id is None:
+                raise AppError(
+                    code="EXECUTION_SCOPE_SNAPSHOT_FAILED",
+                    message=f"用例 {case.case_no} 缺少稳定修订，无法冻结执行范围",
+                    status_code=400,
+                )
+
+            # finalize 仍在 OPEN 的编辑会话，聚合为稳定修订
+            open_stmt = select(TestCaseEditSession).where(
+                TestCaseEditSession.case_id == case.id,
+                TestCaseEditSession.status == "OPEN",
+            )
+            open_sessions = db.scalars(open_stmt).all()
+            for sess in open_sessions:
+                try:
+                    TestCaseService.finalize_edit_session(
+                        db,
+                        project_id,
+                        str(case.id),
+                        str(sess.id),
+                        str(sess.actor_id),
+                        {
+                            "type": "EXECUTION_FINALIZE",
+                            "note": "创建执行任务前聚合未提交的编辑会话",
+                        },
+                    )
+                except AppError as err:
+                    raise AppError(
+                        code="EXECUTION_SCOPE_SNAPSHOT_FAILED",
+                        message=f"用例 {case.case_no} 存在无法聚合的编辑会话，无法冻结执行范围",
+                        status_code=400,
+                    ) from err
+
+            # 重新读取 finalize 后的用例与稳定修订
+            refreshed = db.get(TestCase, case.id)
+            assert refreshed is not None
+            case = refreshed
+            revision = db.get(TestCaseRevision, case.current_revision_id)
+            if revision is None:
+                raise AppError(
+                    code="EXECUTION_SCOPE_SNAPSHOT_FAILED",
+                    message=f"用例 {case.case_no} 的稳定修订不存在",
+                    status_code=400,
+                )
+
+            snapshot = revision.snapshot
+            enriched = {
+                "caseNo": case.case_no,
+                "title": snapshot.get("title"),
+                "modulePaths": build_module_paths(case_modules.get(case.id, [])),
+                "precondition": snapshot.get("precondition"),
+                "priority": snapshot.get("priority"),
+                "caseType": snapshot.get("case_type"),
+                "tags": snapshot.get("tags_json"),
+                "testDataNote": snapshot.get("test_data_note"),
+                "note": snapshot.get("note"),
+                "steps": snapshot.get("steps", []),
+                "sourceDesignTaskId": str(task_uuid),
+                "sourceRequirementId": None,
+                "revisionNo": revision.revision_no,
+                "revisionCreatedAt": (
+                    revision.created_at.isoformat() if revision.created_at else None
+                ),
+            }
+            results.append(
+                {
+                    "test_case_id": str(case.id),
+                    "revision_id": str(revision.id),
+                    "snapshot": enriched,
+                    "snapshot_hash": revision.snapshot_hash,
+                }
+            )
+        return results
+
+    @staticmethod
     def abandon_edit_session(
         db: Session,
         project_id: str,

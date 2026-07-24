@@ -13,8 +13,8 @@
 
     <!-- 工作台汇总面板 -->
     <div class="summary-grid" v-if="!summaryLoading">
-      <div 
-        class="summary-card" 
+      <div
+        class="summary-card"
         :class="{ active: activeQuickFilter === 'my_draft_ready' }"
         @click="toggleQuickFilter('my_draft_ready')"
       >
@@ -24,8 +24,8 @@
           <span class="label">待我开始</span>
         </div>
       </div>
-      <div 
-        class="summary-card" 
+      <div
+        class="summary-card"
         :class="{ active: activeQuickFilter === 'my_in_progress' }"
         @click="toggleQuickFilter('my_in_progress')"
       >
@@ -35,8 +35,8 @@
           <span class="label">我进行中的</span>
         </div>
       </div>
-      <div 
-        class="summary-card" 
+      <div
+        class="summary-card"
         :class="{ active: activeQuickFilter === 'my_participant' }"
         @click="toggleQuickFilter('my_participant')"
       >
@@ -46,8 +46,8 @@
           <span class="label">我参与的</span>
         </div>
       </div>
-      <div 
-        class="summary-card" 
+      <div
+        class="summary-card"
         :class="{ active: activeQuickFilter === 'blocked' }"
         @click="toggleQuickFilter('blocked')"
       >
@@ -57,8 +57,8 @@
           <span class="label">项目阻塞中</span>
         </div>
       </div>
-      <div 
-        class="summary-card" 
+      <div
+        class="summary-card"
         :class="{ active: activeQuickFilter === 'overdue' }"
         @click="toggleQuickFilter('overdue')"
       >
@@ -68,8 +68,8 @@
           <span class="label">已逾期</span>
         </div>
       </div>
-      <div 
-        class="summary-card" 
+      <div
+        class="summary-card"
         :class="{ active: activeQuickFilter === 'due_soon' }"
         @click="toggleQuickFilter('due_soon')"
       >
@@ -88,10 +88,10 @@
     <div class="filter-bar">
       <div class="search-input-wrapper">
         <span class="search-icon">🔍</span>
-        <input 
-          type="text" 
-          v-model="filters.q" 
-          placeholder="搜索任务编号或标题..." 
+        <input
+          type="text"
+          v-model="filters.q"
+          placeholder="搜索任务编号或标题..."
           @input="handleSearch"
           class="form-control"
         />
@@ -142,7 +142,7 @@
 
         <!-- 排序顺序 -->
         <button class="btn-sort" @click="toggleSortOrder">
-          {{ filters.sortOrder === 'asc' ? '▲ 正序' : '▼ 倒序' }}
+          {{ filters.sortOrder === "asc" ? "▲ 正序" : "▼ 倒序" }}
         </button>
 
         <!-- 清理所有快捷/搜索过滤 -->
@@ -195,7 +195,10 @@
               </td>
               <td>
                 <div class="task-title-wrapper">
-                  <router-link :to="`/projects/${projectId}/test-tasks/${t.id}`" class="task-title-link">
+                  <router-link
+                    :to="`/projects/${projectId}/test-tasks/${t.id}`"
+                    class="task-title-link"
+                  >
                     {{ t.title }}
                   </router-link>
                   <div class="tags-wrapper" v-if="t.tagsJson && t.tagsJson.length > 0">
@@ -208,7 +211,7 @@
               </td>
               <td>
                 <span class="type-badge" :class="t.taskType">
-                  {{ t.taskType === 'CASE_DESIGN' ? '设计' : '执行' }}
+                  {{ t.taskType === "CASE_DESIGN" ? "设计" : "执行" }}
                 </span>
               </td>
               <td>
@@ -221,7 +224,7 @@
                   {{ formatPriority(t.priority) }}
                 </span>
               </td>
-              <td class="text-secondary">{{ t.ownerName || '未指定' }}</td>
+              <td class="text-secondary">{{ t.ownerName || "未指定" }}</td>
               <td>
                 <div class="date-range">
                   <span class="start-date">{{ formatDateShort(t.plannedStartAt) }}</span>
@@ -234,7 +237,7 @@
               </td>
               <td>
                 <span class="requirement-count-badge">
-                  {{ t.status === 'DRAFT' ? '配置中' : '已关联' }}
+                  {{ t.status === "DRAFT" ? "配置中" : "已关联" }}
                 </span>
               </td>
               <td>
@@ -242,16 +245,16 @@
                   <router-link :to="`/projects/${projectId}/test-tasks/${t.id}`" class="btn-action">
                     详情
                   </router-link>
-                  <button 
-                    v-if="t.status === 'COMPLETED' || t.status === 'CANCELLED'" 
-                    class="btn-action archive-btn" 
+                  <button
+                    v-if="t.status === 'COMPLETED' || t.status === 'CANCELLED'"
+                    class="btn-action archive-btn"
                     @click="archiveTask(t)"
                   >
                     归档
                   </button>
-                  <button 
-                    v-if="t.status === 'ARCHIVED'" 
-                    class="btn-action restore-btn" 
+                  <button
+                    v-if="t.status === 'ARCHIVED'"
+                    class="btn-action restore-btn"
                     @click="restoreTask(t)"
                   >
                     激活
@@ -267,17 +270,17 @@
       <div class="pagination-bar" v-if="totalTasks > 0">
         <span class="total-info">共 {{ totalTasks }} 个任务</span>
         <div class="pagination-buttons">
-          <button 
-            class="btn btn-secondary" 
-            :disabled="currentPage === 1" 
+          <button
+            class="btn btn-secondary"
+            :disabled="currentPage === 1"
             @click="changePage(currentPage - 1)"
           >
             上一页
           </button>
           <span class="page-num">{{ currentPage }} / {{ totalPages }}</span>
-          <button 
-            class="btn btn-secondary" 
-            :disabled="currentPage === totalPages" 
+          <button
+            class="btn btn-secondary"
+            :disabled="currentPage === totalPages"
             @click="changePage(currentPage + 1)"
           >
             下一页
@@ -287,12 +290,12 @@
     </div>
 
     <!-- 创建抽屉组件 -->
-    <CreateTaskDrawer 
-      v-if="createDrawerVisible" 
-      :projectId="projectId" 
+    <CreateTaskDrawer
+      v-if="createDrawerVisible"
+      :projectId="projectId"
       :versions="versions"
       :members="members"
-      @close="closeCreateDrawer" 
+      @close="closeCreateDrawer"
       @created="onTaskCreated"
     />
   </div>
@@ -334,7 +337,7 @@ const summaryData = ref({
   blockedCount: 0,
   overdueCount: 0,
   dueSoonCount: 0,
-  recentTasks: [] as TestTask[]
+  recentTasks: [] as TestTask[],
 });
 
 // 分页与排序
@@ -353,7 +356,7 @@ const filters = reactive({
   status: "",
   ownerId: "",
   sortBy: "updated_at",
-  sortOrder: "desc"
+  sortOrder: "desc",
 });
 
 // 搜索防抖
@@ -414,7 +417,7 @@ const fetchTasks = async () => {
 
   try {
     const offset = (currentPage.value - 1) * limit.value;
-    
+
     // 构建 API query 选项
     const apiParams: Record<string, any> = {
       q: filters.q,
@@ -425,7 +428,7 @@ const fetchTasks = async () => {
       sortBy: filters.sortBy,
       sortOrder: filters.sortOrder,
       limit: limit.value,
-      offset: offset
+      offset: offset,
     };
 
     // 快捷选项过滤条件叠加
@@ -443,18 +446,18 @@ const fetchTasks = async () => {
     }
 
     const res = await testTasksApi.list(projectId.value, apiParams);
-    
+
     // 如果是 my_draft_ready，前端再二次过滤状态为 DRAFT 或者是 READY 的数据以保精准
     if (activeQuickFilter.value === "my_draft_ready") {
-      tasks.value = res.items.filter(t => t.status === "DRAFT" || t.status === "READY");
+      tasks.value = res.items.filter((t) => t.status === "DRAFT" || t.status === "READY");
       totalTasks.value = tasks.value.length;
     } else if (activeQuickFilter.value === "due_soon") {
       // 在前端做 3 天内即将到期且未完成的二次过滤
       const now = new Date();
       const in3Days = new Date();
       in3Days.setDate(now.getDate() + 3);
-      
-      tasks.value = res.items.filter(t => {
+
+      tasks.value = res.items.filter((t) => {
         if (["COMPLETED", "CANCELLED", "ARCHIVED"].includes(t.status)) return false;
         const end = new Date(t.plannedEndAt);
         return end >= now && end <= in3Days;
@@ -489,9 +492,9 @@ const fetchVersionsAndMembers = async () => {
   try {
     const [vList, mList] = await Promise.all([
       versionsApi.list(projectId.value, { limit: 100 }),
-      apiClient.get(`/api/v1/projects/${projectId.value}/members`, (data) => data as Member[])
+      apiClient.get(`/api/v1/projects/${projectId.value}/members`, (data) => data as Member[]),
     ]);
-    versions.value = vList.items.filter(v => v.status !== "ARCHIVED");
+    versions.value = vList.items.filter((v) => v.status !== "ARCHIVED");
     members.value = mList;
   } catch (e) {
     console.error("加载关联过滤选项失败", e);
@@ -516,7 +519,7 @@ const archiveTask = async (task: TestTask) => {
   try {
     await testTasksApi.transition(projectId.value, task.id, {
       targetStatus: "ARCHIVED",
-      rowVersion: task.rowVersion
+      rowVersion: task.rowVersion,
     });
     alert("归档成功");
     fetchTasks();
@@ -537,7 +540,7 @@ const restoreTask = async (task: TestTask) => {
     await testTasksApi.transition(projectId.value, task.id, {
       targetStatus: "previous_status",
       reasonText: reason,
-      rowVersion: task.rowVersion
+      rowVersion: task.rowVersion,
     });
     alert("恢复成功");
     fetchTasks();
@@ -595,7 +598,7 @@ const formatStatus = (s: string) => {
     BLOCKED: "已阻塞",
     COMPLETED: "已完成",
     CANCELLED: "已取消",
-    ARCHIVED: "已归档"
+    ARCHIVED: "已归档",
   };
   return statusMap[s] || s;
 };
@@ -605,7 +608,7 @@ const formatPriority = (p: string) => {
     LOW: "低",
     MEDIUM: "中",
     HIGH: "高",
-    URGENT: "紧急"
+    URGENT: "紧急",
   };
   return priorityMap[p] || p;
 };
@@ -625,10 +628,13 @@ onMounted(() => {
 });
 
 // 监听路由参数变化，处理刷新或回退
-watch(() => route.query, () => {
-  syncFiltersFromQuery();
-  fetchTasks();
-});
+watch(
+  () => route.query,
+  () => {
+    syncFiltersFromQuery();
+    fetchTasks();
+  },
+);
 </script>
 
 <style scoped>
@@ -816,7 +822,8 @@ watch(() => route.query, () => {
   padding-left: 38px;
 }
 
-.form-control, .form-select {
+.form-control,
+.form-select {
   background: rgba(30, 41, 59, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
@@ -828,7 +835,8 @@ watch(() => route.query, () => {
   transition: all 0.2s ease;
 }
 
-.form-control:focus, .form-select:focus {
+.form-control:focus,
+.form-select:focus {
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
@@ -878,7 +886,9 @@ watch(() => route.query, () => {
   justify-content: space-between;
 }
 
-.loading-state, .empty-state, .error-state {
+.loading-state,
+.empty-state,
+.error-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -899,7 +909,8 @@ watch(() => route.query, () => {
   margin-bottom: 16px;
 }
 
-.empty-icon, .error-icon {
+.empty-icon,
+.error-icon {
   font-size: 44px;
   margin-bottom: 16px;
   filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.4));
@@ -1058,13 +1069,41 @@ h3 {
   border-radius: 6px;
 }
 
-.status-badge.draft { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.2); }
-.status-badge.ready { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.2); }
-.status-badge.in_progress { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
-.status-badge.blocked { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
-.status-badge.completed { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
-.status-badge.cancelled { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.2); }
-.status-badge.archived { background: rgba(120, 113, 108, 0.15); color: #a8a29e; border: 1px solid rgba(120, 113, 108, 0.2); }
+.status-badge.draft {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+.status-badge.ready {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+.status-badge.in_progress {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+.status-badge.blocked {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.status-badge.completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.status-badge.cancelled {
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+.status-badge.archived {
+  background: rgba(120, 113, 108, 0.15);
+  color: #a8a29e;
+  border: 1px solid rgba(120, 113, 108, 0.2);
+}
 
 .priority-badge {
   display: inline-block;
@@ -1074,10 +1113,22 @@ h3 {
   border-radius: 4px;
 }
 
-.priority-badge.low { background: rgba(255, 255, 255, 0.05); color: #94a3b8; }
-.priority-badge.medium { background: rgba(99, 102, 241, 0.1); color: #818cf8; }
-.priority-badge.high { background: rgba(245, 158, 11, 0.1); color: #fbbf24; }
-.priority-badge.urgent { background: rgba(239, 68, 68, 0.1); color: #f87171; }
+.priority-badge.low {
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+}
+.priority-badge.medium {
+  background: rgba(99, 102, 241, 0.1);
+  color: #818cf8;
+}
+.priority-badge.high {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+.priority-badge.urgent {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
 
 .requirement-count-badge {
   background: rgba(255, 255, 255, 0.04);
@@ -1196,12 +1247,19 @@ h3 {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 0.35; }
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 @media (max-width: 1024px) {

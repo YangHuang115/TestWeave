@@ -1,14 +1,14 @@
-import os
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from datetime import datetime, UTC, timedelta
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from testweave.modules.users.service import UserService
 from testweave.modules.projects.service import ProjectService
-from testweave.modules.versions.service import VersionService
 from testweave.modules.requirements.service import RequirementService
+from testweave.modules.users.service import UserService
+from testweave.modules.versions.service import VersionService
 
 pytestmark = pytest.mark.integration
 
@@ -18,19 +18,35 @@ async def task_integration_context(client: AsyncClient, session: Session) -> dic
     """准备测试任务集成测试上下文"""
     # 1. 创建三个测试用户
     admin_user = UserService.create_user(
-        session, username="taskapiadmin", email="taskapiadmin@tw.com", display_name="Task API Admin", password="pwd"
+        session,
+        username="taskapiadmin",
+        email="taskapiadmin@tw.com",
+        display_name="Task API Admin",
+        password="pwd",
     )
     member_user = UserService.create_user(
-        session, username="taskapimember", email="taskapimember@tw.com", display_name="Task API Member", password="pwd"
+        session,
+        username="taskapimember",
+        email="taskapimember@tw.com",
+        display_name="Task API Member",
+        password="pwd",
     )
-    guest_user = UserService.create_user(
-        session, username="taskapiguest", email="taskapiguest@tw.com", display_name="Task API Guest", password="pwd"
+    UserService.create_user(
+        session,
+        username="taskapiguest",
+        email="taskapiguest@tw.com",
+        display_name="Task API Guest",
+        password="pwd",
     )
     session.commit()
 
     # 2. 创建项目
     project = ProjectService.create_project(
-        session, key="APITASKPROJ", name="API Task Project", owner_id=admin_user.id, request_id="req-p"
+        session,
+        key="APITASKPROJ",
+        name="API Task Project",
+        owner_id=admin_user.id,
+        request_id="req-p",
     )
     session.commit()
 
@@ -114,13 +130,15 @@ async def task_integration_context(client: AsyncClient, session: Session) -> dic
 
 
 @pytest.mark.anyio
-async def test_task_api_lifecycle(client: AsyncClient, task_integration_context: dict[str, Any]) -> None:
+async def test_task_api_lifecycle(
+    client: AsyncClient, task_integration_context: dict[str, Any]
+) -> None:
     project = task_integration_context["project"]
     version = task_integration_context["version"]
     requirement = task_integration_context["requirement"]
-    admin_user = task_integration_context["admin_user"]
+    task_integration_context["admin_user"]
     member_user = task_integration_context["member_user"]
-    admin_session = task_integration_context["admin_session"]
+    task_integration_context["admin_session"]
     member_session = task_integration_context["member_session"]
     guest_session = task_integration_context["guest_session"]
 
@@ -139,13 +157,11 @@ async def test_task_api_lifecycle(client: AsyncClient, task_integration_context:
         "testGoal": "覆盖高并发",
         "excludedScope": "暂无",
         "tagsJson": ["SMS", "Design"],
-        "requirementId": str(requirement.id)
+        "requirementId": str(requirement.id),
     }
 
     res = await client.post(
-        f"/api/v1/projects/{project.id}/test-tasks",
-        json=create_payload,
-        **member_session
+        f"/api/v1/projects/{project.id}/test-tasks", json=create_payload, **member_session
     )
     assert res.status_code == 201
     task_data = res.json()
@@ -156,17 +172,14 @@ async def test_task_api_lifecycle(client: AsyncClient, task_integration_context:
     task_id = task_data["id"]
 
     # 2. 非项目成员访问该任务详情，被拒绝 (GET)
-    res = await client.get(
-        f"/api/v1/projects/{project.id}/test-tasks/{task_id}",
-        **guest_session
-    )
+    res = await client.get(f"/api/v1/projects/{project.id}/test-tasks/{task_id}", **guest_session)
     assert res.status_code == 403
 
     # 3. 关联需求且获得重复提醒校验 (PUT)
     assoc_res = await client.put(
         f"/api/v1/projects/{project.id}/test-tasks/{task_id}/requirements",
         json={"requirementId": str(requirement.id)},
-        **member_session
+        **member_session,
     )
     assert assoc_res.status_code == 200
     assoc_data = assoc_res.json()
@@ -175,28 +188,22 @@ async def test_task_api_lifecycle(client: AsyncClient, task_integration_context:
 
     # 4. 执行状态流转 READY -> IN_PROGRESS (POST)
     # 首先流转至 READY
-    trans_ready_payload = {
-        "targetStatus": "READY",
-        "rowVersion": assoc_data["task"]["rowVersion"]
-    }
+    trans_ready_payload = {"targetStatus": "READY", "rowVersion": assoc_data["task"]["rowVersion"]}
     res = await client.post(
         f"/api/v1/projects/{project.id}/test-tasks/{task_id}/transitions",
         json=trans_ready_payload,
-        **member_session
+        **member_session,
     )
     assert res.status_code == 200
     task_data = res.json()
     assert task_data["status"] == "READY"
 
     # 流转至 IN_PROGRESS
-    trans_progress_payload = {
-        "targetStatus": "IN_PROGRESS",
-        "rowVersion": task_data["rowVersion"]
-    }
+    trans_progress_payload = {"targetStatus": "IN_PROGRESS", "rowVersion": task_data["rowVersion"]}
     res = await client.post(
         f"/api/v1/projects/{project.id}/test-tasks/{task_id}/transitions",
         json=trans_progress_payload,
-        **member_session
+        **member_session,
     )
     assert res.status_code == 200
     task_data = res.json()
@@ -210,21 +217,24 @@ async def test_task_api_lifecycle(client: AsyncClient, task_integration_context:
         "ownerId": str(member_user.id),
         "plannedStartAt": task_data["plannedStartAt"],
         "plannedEndAt": task_data["plannedEndAt"],
-        "rowVersion": task_data["rowVersion"] - 1 # 过期版本
+        "rowVersion": task_data["rowVersion"] - 1,  # 过期版本
     }
     res = await client.patch(
-        f"/api/v1/projects/{project.id}/test-tasks/{task_id}",
-        json=update_payload,
-        **member_session
+        f"/api/v1/projects/{project.id}/test-tasks/{task_id}", json=update_payload, **member_session
     )
     assert res.status_code == 409
 
     # 6. 工作台摘要 API 校验 (GET)
-    res = await client.get(
-        f"/api/v1/projects/{project.id}/test-tasks/my-summary",
-        **member_session
-    )
+    res = await client.get(f"/api/v1/projects/{project.id}/test-tasks/my-summary", **member_session)
     assert res.status_code == 200
     summary_data = res.json()
     print("DEBUG_SUMMARY_DATA:", summary_data)
     assert summary_data["myInProgressCount"] == 1
+
+    # 7. 测试查询关联需求 (GET)
+    res_reqs = await client.get(
+        f"/api/v1/projects/{project.id}/test-tasks/{task_id}/requirements", **member_session
+    )
+    assert res_reqs.status_code == 200
+    reqs_data = res_reqs.json()
+    assert len(reqs_data) == 1

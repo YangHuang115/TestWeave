@@ -11,7 +11,7 @@ from testweave.api.dependencies.database import get_db
 from testweave.api.dependencies.projects import require_project_permission
 from testweave.db.models import User
 from testweave.modules.versions.service import VersionService
-from testweave.shared.permissions import VERSION_READ, VERSION_MANAGE
+from testweave.shared.permissions import VERSION_MANAGE, VERSION_READ
 
 router = APIRouter(prefix="/projects/{projectId}/versions", tags=["versions"])
 
@@ -35,9 +35,7 @@ class VersionUpdateRequest(BaseModel):
     planned_end_at: datetime | None = None
     row_version: int = Field(..., alias="rowVersion")
 
-    model_config = {
-        "populate_by_name": True
-    }
+    model_config = {"populate_by_name": True}
 
 
 class VersionResponse(BaseModel):
@@ -53,10 +51,7 @@ class VersionResponse(BaseModel):
     created_at: Any = Field(..., alias="createdAt")
     updated_at: Any = Field(..., alias="updatedAt")
 
-    model_config = {
-        "populate_by_name": True,
-        "from_attributes": True
-    }
+    model_config = {"populate_by_name": True, "from_attributes": True}
 
 
 class VersionListResponse(BaseModel):
@@ -130,7 +125,10 @@ def get_version(
     version = VersionService.get_version(db, project_id=projectId, version_id=versionId)
     if not version:
         from testweave.core.errors import AppError
-        raise AppError(code="VERSION_NOT_FOUND", message="版本不存在或不属于当前项目", status_code=404)
+
+        raise AppError(
+            code="VERSION_NOT_FOUND", message="版本不存在或不属于当前项目", status_code=404
+        )
     return VersionResponse.model_validate(version)
 
 

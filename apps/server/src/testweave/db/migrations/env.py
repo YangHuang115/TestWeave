@@ -5,7 +5,6 @@ from sqlalchemy import engine_from_config, pool
 
 from testweave.core.config import get_settings
 from testweave.db.base import Base
-import testweave.db.models
 from testweave.db.session import migration_connect_args
 
 config = context.config

@@ -1,19 +1,16 @@
 import io
-import os
-import uuid
 import zipfile
+
 import pytest
-from datetime import UTC, datetime
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from testweave.core.errors import AppError
-from testweave.db.models import RequirementAttachment
 from testweave.modules.attachments.service import AttachmentService
-from testweave.modules.requirements.service import RequirementService
-from testweave.modules.versions.service import VersionService
 from testweave.modules.projects.service import ProjectService
+from testweave.modules.requirements.service import RequirementService
 from testweave.modules.users.service import UserService
-from fastapi import UploadFile
+from testweave.modules.versions.service import VersionService
 
 
 @pytest.fixture
@@ -72,7 +69,9 @@ def create_mock_docx(vba: bool = False, file_count: int = 1, zip_bomb: bool = Fa
                 zf.writestr(f"item_{i}.txt", "content")
         elif zip_bomb:
             zf.writestr("word/document.xml", "<w:document></w:document>")
-            zf.writestr("huge.txt", b"\x00" * (1024 * 1024 * 10), compress_type=zipfile.ZIP_DEFLATED)
+            zf.writestr(
+                "huge.txt", b"\x00" * (1024 * 1024 * 10), compress_type=zipfile.ZIP_DEFLATED
+            )
         else:
             zf.writestr("word/document.xml", "<w:document></w:document>")
             if vba:
@@ -81,7 +80,9 @@ def create_mock_docx(vba: bool = False, file_count: int = 1, zip_bomb: bool = Fa
 
 
 @pytest.mark.anyio
-async def test_upload_attachment_docx_safety_filter(db: Session, attachment_test_context: dict) -> None:
+async def test_upload_attachment_docx_safety_filter(
+    db: Session, attachment_test_context: dict
+) -> None:
     user = attachment_test_context["user"]
     project = attachment_test_context["project"]
     req = attachment_test_context["requirement"]
@@ -147,7 +148,9 @@ async def test_upload_attachment_docx_safety_filter(db: Session, attachment_test
 
 
 @pytest.mark.anyio
-async def test_attachment_lifecycle_list_download_archive(db: Session, attachment_test_context: dict) -> None:
+async def test_attachment_lifecycle_list_download_archive(
+    db: Session, attachment_test_context: dict
+) -> None:
     user = attachment_test_context["user"]
     project = attachment_test_context["project"]
     req = attachment_test_context["requirement"]

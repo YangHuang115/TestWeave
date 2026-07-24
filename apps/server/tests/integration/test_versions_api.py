@@ -1,12 +1,11 @@
-import os
 from typing import Any
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from testweave.modules.users.service import UserService
 from testweave.modules.projects.service import ProjectService
-from testweave.modules.versions.service import VersionService
+from testweave.modules.users.service import UserService
 
 pytestmark = pytest.mark.integration
 
@@ -16,19 +15,35 @@ async def integration_context(client: AsyncClient, session: Session) -> dict[str
     """准备集成测试所需的用户和项目，并建立不同角色的客户端 session cookies"""
     # 创建三个测试用户
     admin_user = UserService.create_user(
-        session, username="apiadmin", email="apiadmin@tw.com", display_name="API Admin", password="pwd"
+        session,
+        username="apiadmin",
+        email="apiadmin@tw.com",
+        display_name="API Admin",
+        password="pwd",
     )
     member_user = UserService.create_user(
-        session, username="apimember", email="apimember@tw.com", display_name="API Member", password="pwd"
+        session,
+        username="apimember",
+        email="apimember@tw.com",
+        display_name="API Member",
+        password="pwd",
     )
     guest_user = UserService.create_user(
-        session, username="apiguest", email="apiguest@tw.com", display_name="API Guest", password="pwd"
+        session,
+        username="apiguest",
+        email="apiguest@tw.com",
+        display_name="API Guest",
+        password="pwd",
     )
     session.commit()
 
     # 创建项目 (系统管理员创建并设 admin_user 为所有者/管理员)
     project = ProjectService.create_project(
-        session, key="APIVPROJ", name="API Version Project", owner_id=admin_user.id, request_id="req-p"
+        session,
+        key="APIVPROJ",
+        name="API Version Project",
+        owner_id=admin_user.id,
+        request_id="req-p",
     )
     session.commit()
 
@@ -77,7 +92,9 @@ async def integration_context(client: AsyncClient, session: Session) -> dict[str
 
 
 @pytest.mark.anyio
-async def test_version_api_lifecycle(client: AsyncClient, integration_context: dict[str, Any]) -> None:
+async def test_version_api_lifecycle(
+    client: AsyncClient, integration_context: dict[str, Any]
+) -> None:
     project = integration_context["project"]
     admin_session = integration_context["admin_session"]
     member_session = integration_context["member_session"]
@@ -93,7 +110,7 @@ async def test_version_api_lifecycle(client: AsyncClient, integration_context: d
         "planned_start_at": "2026-07-20T12:00:00Z",
         "planned_end_at": "2026-07-30T12:00:00Z",
     }
-    
+
     res = await client.post(
         f"/api/v1/projects/{project.id}/versions",
         json=create_payload,

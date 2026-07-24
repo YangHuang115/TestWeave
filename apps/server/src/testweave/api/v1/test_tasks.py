@@ -1,18 +1,27 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from fastapi import APIRouter, Depends, Request, Path, Query, Body
+
+from fastapi import APIRouter, Body, Depends, Path, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, func, or_
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from testweave.api.dependencies.auth import get_current_user
 from testweave.api.dependencies.database import get_db
 from testweave.api.dependencies.projects import require_project_permission
-from testweave.core.errors import AppError
-from testweave.db.models import User, TestTask, TestTaskStatusHistory, TestTaskBlockage, ProjectMember, TestTaskParticipant, TestTaskRequirement
+from testweave.db.models import (
+    ProjectMember,
+    Requirement,
+    TestTask,
+    TestTaskBlockage,
+    TestTaskParticipant,
+    TestTaskRequirement,
+    TestTaskStatusHistory,
+    User,
+)
 from testweave.modules.test_tasks.service import TestTaskService
-from testweave.shared.permissions import TASK_READ, TASK_MANAGE
+from testweave.shared.permissions import TASK_MANAGE, TASK_READ
 
 router = APIRouter(prefix="/projects/{projectId}/test-tasks", tags=["test-tasks"])
 
@@ -34,9 +43,7 @@ class TestTaskCreateRequest(BaseModel):
     tagsJson: list[str] | None = Field(None, alias="tagsJson")
     requirementId: uuid.UUID | None = Field(None, alias="requirementId")
 
-    model_config = {
-        "populate_by_name": True
-    }
+    model_config = {"populate_by_name": True}
 
 
 class TestTaskUpdateRequest(BaseModel):
@@ -51,25 +58,19 @@ class TestTaskUpdateRequest(BaseModel):
     tagsJson: list[str] | None = Field(None, alias="tagsJson")
     rowVersion: int = Field(..., alias="rowVersion")
 
-    model_config = {
-        "populate_by_name": True
-    }
+    model_config = {"populate_by_name": True}
 
 
 class TestTaskRequirementsRequest(BaseModel):
     requirementId: uuid.UUID | None = Field(None, alias="requirementId")
 
-    model_config = {
-        "populate_by_name": True
-    }
+    model_config = {"populate_by_name": True}
 
 
 class TestTaskParticipantsRequest(BaseModel):
     userIds: list[uuid.UUID] = Field(..., alias="userIds")
 
-    model_config = {
-        "populate_by_name": True
-    }
+    model_config = {"populate_by_name": True}
 
 
 class TestTaskTransitionRequest(BaseModel):
@@ -78,9 +79,7 @@ class TestTaskTransitionRequest(BaseModel):
     reasonText: str | None = Field(None, alias="reasonText")
     rowVersion: int = Field(..., alias="rowVersion")
 
-    model_config = {
-        "populate_by_name": True
-    }
+    model_config = {"populate_by_name": True}
 
 
 class TestTaskResponse(BaseModel):
@@ -110,7 +109,7 @@ class TestTaskResponse(BaseModel):
     updated_by: uuid.UUID | None = Field(None, alias="updatedBy")
     updated_at: datetime = Field(..., alias="updatedAt")
     archived_at: datetime | None = Field(None, alias="archivedAt")
-    
+
     # 额外附加字段供前端展示，在API端点中组装
     ownerName: str | None = None
     isBlocked: bool = False
@@ -120,10 +119,7 @@ class TestTaskResponse(BaseModel):
     requirementNo: str | None = None
     requirementTitle: str | None = None
 
-    model_config = {
-        "populate_by_name": True,
-        "from_attributes": True
-    }
+    model_config = {"populate_by_name": True, "from_attributes": True}
 
 
 class TestTaskListResponse(BaseModel):
@@ -134,7 +130,6 @@ class TestTaskListResponse(BaseModel):
 class TestTaskRequirementsResponse(BaseModel):
     warnings: list[dict]
     task: TestTaskResponse
-
 
 
 class TestTaskActivityResponse(BaseModel):
@@ -149,10 +144,7 @@ class TestTaskActivityResponse(BaseModel):
     actorName: str | None = None
     created_at: datetime = Field(..., alias="createdAt")
 
-    model_config = {
-        "populate_by_name": True,
-        "from_attributes": True
-    }
+    model_config = {"populate_by_name": True, "from_attributes": True}
 
 
 class TestTaskSummaryResponse(BaseModel):
@@ -170,26 +162,26 @@ class TestTaskSummaryResponse(BaseModel):
 # ==============================================================================
 def populate_task_display_fields(db: Session, task: TestTask) -> TestTaskResponse:
     res = TestTaskResponse.model_validate(task)
-    
+
     # owner name
     owner = db.get(User, task.owner_id)
     if owner:
         res.ownerName = owner.display_name
-        
+
     # overdue
     now_time = datetime.now(UTC)
-    res.isOverdue = (
-        task.planned_end_at.replace(tzinfo=None) < now_time.replace(tzinfo=None) and
-        task.status not in ["COMPLETED", "CANCELLED", "ARCHIVED"]
-    )
-    
+    res.isOverdue = task.planned_end_at.replace(tzinfo=None) < now_time.replace(
+        tzinfo=None
+    ) and task.status not in ["COMPLETED", "CANCELLED", "ARCHIVED"]
+
     # blocked blockage reason
-    res.isBlocked = (task.status == "BLOCKED")
+    res.isBlocked = task.status == "BLOCKED"
     if res.isBlocked:
-        blockage_stmt = select(TestTaskBlockage).where(
-            TestTaskBlockage.task_id == task.id,
-            TestTaskBlockage.resolved_at.is_(None)
-        ).order_by(TestTaskBlockage.blocked_at.desc())
+        blockage_stmt = (
+            select(TestTaskBlockage)
+            .where(TestTaskBlockage.task_id == task.id, TestTaskBlockage.resolved_at.is_(None))
+            .order_by(TestTaskBlockage.blocked_at.desc())
+        )
         block = db.scalar(blockage_stmt)
         if block:
             res.activeBlockageReason = block.description
@@ -200,17 +192,19 @@ def populate_task_display_fields(db: Session, task: TestTask) -> TestTaskRespons
     if link:
         res.requirementId = link.requirement_id
         from testweave.db.models import Requirement
+
         req = db.get(Requirement, link.requirement_id)
         if req:
             res.requirementNo = req.requirement_no
             res.requirementTitle = req.title
-            
+
     return res
 
 
 # ==============================================================================
 # API Endpoints
 # ==============================================================================
+
 
 @router.get("/my-summary", response_model=TestTaskSummaryResponse)
 def get_my_summary(
@@ -221,55 +215,80 @@ def get_my_summary(
 ):
     """当前用户在当前项目下的测试任务工作台摘要数据"""
     now_time = datetime.now(UTC)
-    now_naive = now_time.replace(tzinfo=None)
 
     # 我负责的待开始/进行中
-    my_draft_ready = db.query(func.count(TestTask.id)).where(
-        TestTask.project_id == projectId,
-        TestTask.owner_id == current_user.id,
-        TestTask.status.in_(["DRAFT", "READY"])
-    ).scalar() or 0
+    my_draft_ready = (
+        db.query(func.count(TestTask.id))
+        .where(
+            TestTask.project_id == projectId,
+            TestTask.owner_id == current_user.id,
+            TestTask.status.in_(["DRAFT", "READY"]),
+        )
+        .scalar()
+        or 0
+    )
 
-    my_in_progress = db.query(func.count(TestTask.id)).where(
-        TestTask.project_id == projectId,
-        TestTask.owner_id == current_user.id,
-        TestTask.status == "IN_PROGRESS"
-    ).scalar() or 0
+    my_in_progress = (
+        db.query(func.count(TestTask.id))
+        .where(
+            TestTask.project_id == projectId,
+            TestTask.owner_id == current_user.id,
+            TestTask.status == "IN_PROGRESS",
+        )
+        .scalar()
+        or 0
+    )
 
     # 我参与的任务
-    my_participant = db.query(func.count(TestTask.id)).join(
-        TestTaskParticipant, TestTaskParticipant.task_id == TestTask.id
-    ).where(
-        TestTask.project_id == projectId,
-        TestTaskParticipant.user_id == current_user.id
-    ).scalar() or 0
+    my_participant = (
+        db.query(func.count(TestTask.id))
+        .join(TestTaskParticipant, TestTaskParticipant.task_id == TestTask.id)
+        .where(TestTask.project_id == projectId, TestTaskParticipant.user_id == current_user.id)
+        .scalar()
+        or 0
+    )
 
     # 项目内已阻塞数
-    blocked = db.query(func.count(TestTask.id)).where(
-        TestTask.project_id == projectId,
-        TestTask.status == "BLOCKED"
-    ).scalar() or 0
+    blocked = (
+        db.query(func.count(TestTask.id))
+        .where(TestTask.project_id == projectId, TestTask.status == "BLOCKED")
+        .scalar()
+        or 0
+    )
 
     # 项目内已超期
-    overdue = db.query(func.count(TestTask.id)).where(
-        TestTask.project_id == projectId,
-        TestTask.planned_end_at < now_time,
-        TestTask.status.not_in(["COMPLETED", "CANCELLED", "ARCHIVED"])
-    ).scalar() or 0
+    overdue = (
+        db.query(func.count(TestTask.id))
+        .where(
+            TestTask.project_id == projectId,
+            TestTask.planned_end_at < now_time,
+            TestTask.status.not_in(["COMPLETED", "CANCELLED", "ARCHIVED"]),
+        )
+        .scalar()
+        or 0
+    )
 
     # 即将到期数（3天内到期，未完成）
     due_soon_limit = now_time + timedelta(days=3)
-    due_soon = db.query(func.count(TestTask.id)).where(
-        TestTask.project_id == projectId,
-        TestTask.planned_end_at >= now_time,
-        TestTask.planned_end_at <= due_soon_limit,
-        TestTask.status.not_in(["COMPLETED", "CANCELLED", "ARCHIVED"])
-    ).scalar() or 0
+    due_soon = (
+        db.query(func.count(TestTask.id))
+        .where(
+            TestTask.project_id == projectId,
+            TestTask.planned_end_at >= now_time,
+            TestTask.planned_end_at <= due_soon_limit,
+            TestTask.status.not_in(["COMPLETED", "CANCELLED", "ARCHIVED"]),
+        )
+        .scalar()
+        or 0
+    )
 
     # 最近更新的任务 (最多5个)
-    stmt = select(TestTask).where(
-        TestTask.project_id == projectId
-    ).order_by(TestTask.updated_at.desc()).limit(5)
+    stmt = (
+        select(TestTask)
+        .where(TestTask.project_id == projectId)
+        .order_by(TestTask.updated_at.desc())
+        .limit(5)
+    )
     recent = db.scalars(stmt).all()
 
     return {
@@ -279,7 +298,7 @@ def get_my_summary(
         "blockedCount": blocked,
         "overdueCount": overdue,
         "dueSoonCount": due_soon,
-        "recentTasks": [populate_task_display_fields(db, t) for t in recent]
+        "recentTasks": [populate_task_display_fields(db, t) for t in recent],
     }
 
 
@@ -310,10 +329,7 @@ def list_tasks(
     if q and q.strip():
         search_pattern = f"%{q.strip()}%"
         stmt = stmt.where(
-            or_(
-                TestTask.task_no.ilike(search_pattern),
-                TestTask.title.ilike(search_pattern)
-            )
+            or_(TestTask.task_no.ilike(search_pattern), TestTask.title.ilike(search_pattern))
         )
     if versionId:
         stmt = stmt.where(TestTask.version_id == versionId)
@@ -338,13 +354,13 @@ def list_tasks(
         if isOverdue:
             stmt = stmt.where(
                 TestTask.planned_end_at < now_time,
-                TestTask.status.not_in(["COMPLETED", "CANCELLED", "ARCHIVED"])
+                TestTask.status.not_in(["COMPLETED", "CANCELLED", "ARCHIVED"]),
             )
         else:
             stmt = stmt.where(
                 ~and_(
                     TestTask.planned_end_at < now_time,
-                    TestTask.status.not_in(["COMPLETED", "CANCELLED", "ARCHIVED"])
+                    TestTask.status.not_in(["COMPLETED", "CANCELLED", "ARCHIVED"]),
                 )
             )
 
@@ -358,19 +374,13 @@ def list_tasks(
     elif sortBy == "priority":
         sort_col = TestTask.priority
 
-    if sortOrder == "asc":
-        stmt = stmt.order_by(sort_col.asc())
-    else:
-        stmt = stmt.order_by(sort_col.desc())
+    stmt = stmt.order_by(sort_col.asc()) if sortOrder == "asc" else stmt.order_by(sort_col.desc())
 
     # Limit and Offset
     stmt = stmt.offset(offset).limit(limit)
     tasks = db.scalars(stmt).all()
 
-    return {
-        "items": [populate_task_display_fields(db, t) for t in tasks],
-        "total": total
-    }
+    return {"items": [populate_task_display_fields(db, t) for t in tasks], "total": total}
 
 
 @router.post("", response_model=TestTaskResponse, status_code=201)
@@ -470,13 +480,10 @@ def update_requirements(
         request_id=request_id,
     )
     db.commit()
-    
+
     # 重新读取以获取乐观锁更新后的最新数据
     task = TestTaskService.get_task_by_id(db, str(projectId), str(taskId))
-    return {
-        "warnings": warnings,
-        "task": populate_task_display_fields(db, task)
-    }
+    return {"warnings": warnings, "task": populate_task_display_fields(db, task)}
 
 
 @router.put("/{taskId}/participants", response_model=TestTaskResponse)
@@ -516,14 +523,13 @@ def transition_status(
     """执行状态机迁移"""
     # 校验用户在该项目下的角色是否为 admin 或者是 lead
     member_stmt = select(ProjectMember).where(
-        ProjectMember.project_id == projectId,
-        ProjectMember.user_id == current_user.id
+        ProjectMember.project_id == projectId, ProjectMember.user_id == current_user.id
     )
     member = db.scalar(member_stmt)
     is_admin_or_lead = False
-    if current_user.is_system_admin:
-        is_admin_or_lead = True
-    elif member and member.role_id in ["project_admin", "test_lead"]:
+    if current_user.is_system_admin or (
+        member and member.role_id in ["project_admin", "test_lead"]
+    ):
         is_admin_or_lead = True
 
     task = TestTaskService.transition_status(
@@ -556,9 +562,13 @@ def list_activities(
     # 获取任务以校验项目隔离
     TestTaskService.get_task_by_id(db, str(projectId), str(taskId))
 
-    stmt = select(TestTaskStatusHistory).where(
-        TestTaskStatusHistory.task_id == taskId
-    ).order_by(TestTaskStatusHistory.created_at.desc()).offset(offset).limit(limit)
+    stmt = (
+        select(TestTaskStatusHistory)
+        .where(TestTaskStatusHistory.task_id == taskId)
+        .order_by(TestTaskStatusHistory.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
     histories = db.scalars(stmt).all()
 
     results = []
@@ -591,8 +601,9 @@ def get_task_requirements(
         .where(TestTaskRequirement.task_id == taskId)
     )
     reqs = db.scalars(stmt).all()
-    
+
     # 动态转化为符合 RequirementResponse 驼峰输出要求的 dict 列表
     # 我们也可以直接 import RequirementResponse
     from testweave.api.v1.requirements import RequirementResponse
+
     return [RequirementResponse.model_validate(r) for r in reqs]

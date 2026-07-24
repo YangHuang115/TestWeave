@@ -1,15 +1,15 @@
 import io
-import uuid
 import zipfile
 from typing import Any
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from testweave.modules.users.service import UserService
 from testweave.modules.projects.service import ProjectService
-from testweave.modules.versions.service import VersionService
 from testweave.modules.requirements.service import RequirementService
+from testweave.modules.users.service import UserService
+from testweave.modules.versions.service import VersionService
 
 pytestmark = pytest.mark.integration
 
@@ -17,10 +17,18 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 async def att_integration_context(client: AsyncClient, session: Session) -> dict[str, Any]:
     admin_user = UserService.create_user(
-        session, username="attapiadmin", email="ata@tw.com", display_name="Att API Admin", password="pwd"
+        session,
+        username="attapiadmin",
+        email="ata@tw.com",
+        display_name="Att API Admin",
+        password="pwd",
     )
-    guest_user = UserService.create_user(
-        session, username="attapiguest", email="atg@tw.com", display_name="Att API Guest", password="pwd"
+    UserService.create_user(
+        session,
+        username="attapiguest",
+        email="atg@tw.com",
+        display_name="Att API Guest",
+        password="pwd",
     )
     session.commit()
 
@@ -29,7 +37,7 @@ async def att_integration_context(client: AsyncClient, session: Session) -> dict
     )
     session.commit()
 
-    version = VersionService.create_version(
+    VersionService.create_version(
         session,
         project_id=project.id,
         key="v1.0",
@@ -82,7 +90,9 @@ def create_valid_docx_bytes() -> bytes:
 
 
 @pytest.mark.anyio
-async def test_attachment_api_lifecycle(client: AsyncClient, session: Session, att_integration_context: dict[str, Any]) -> None:
+async def test_attachment_api_lifecycle(
+    client: AsyncClient, session: Session, att_integration_context: dict[str, Any]
+) -> None:
     project = att_integration_context["project"]
     req = att_integration_context["requirement"]
     admin_session = att_integration_context["admin_session"]
@@ -92,7 +102,13 @@ async def test_attachment_api_lifecycle(client: AsyncClient, session: Session, a
 
     # 1. 管理员成功上传附件 (POST)
     # httpx files 接收 tuple: (filename, file_bytes, content_type)
-    files = {"file": ("测试文档.docx", docx_bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+    files = {
+        "file": (
+            "测试文档.docx",
+            docx_bytes,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    }
     res_upload = await client.post(
         f"/api/v1/projects/{project.id}/requirements/{req.id}/attachments",
         files=files,

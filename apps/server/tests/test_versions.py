@@ -1,13 +1,12 @@
-import uuid
 from datetime import UTC, datetime, timedelta
+
 import pytest
 from sqlalchemy.orm import Session
 
 from testweave.core.errors import AppError
-from testweave.db.models import Project, User, Version
-from testweave.modules.versions.service import VersionService
 from testweave.modules.projects.service import ProjectService
 from testweave.modules.users.service import UserService
+from testweave.modules.versions.service import VersionService
 
 
 @pytest.fixture
@@ -37,7 +36,7 @@ def test_context(db: Session) -> dict:
 def test_create_version_success(db: Session, test_context: dict) -> None:
     user = test_context["user"]
     project = test_context["project"]
-    
+
     now = datetime.now(UTC)
     planned_start = now + timedelta(days=1)
     planned_end = now + timedelta(days=10)
@@ -64,15 +63,29 @@ def test_create_version_success(db: Session, test_context: dict) -> None:
     assert version.owner_id == user.id
     assert version.planned_start_at is not None
     assert version.planned_end_at is not None
-    assert abs((version.planned_start_at.replace(tzinfo=None) - planned_start.replace(tzinfo=None)).total_seconds()) < 1
-    assert abs((version.planned_end_at.replace(tzinfo=None) - planned_end.replace(tzinfo=None)).total_seconds()) < 1
+    assert (
+        abs(
+            (
+                version.planned_start_at.replace(tzinfo=None) - planned_start.replace(tzinfo=None)
+            ).total_seconds()
+        )
+        < 1
+    )
+    assert (
+        abs(
+            (
+                version.planned_end_at.replace(tzinfo=None) - planned_end.replace(tzinfo=None)
+            ).total_seconds()
+        )
+        < 1
+    )
     assert version.row_version == 1
 
 
 def test_create_version_time_validation(db: Session, test_context: dict) -> None:
     user = test_context["user"]
     project = test_context["project"]
-    
+
     now = datetime.now(UTC)
     # 结束时间早于开始时间
     planned_start = now + timedelta(days=10)

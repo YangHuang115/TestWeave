@@ -7,6 +7,24 @@
   --tw-color-surface: #ffffff;
   --tw-color-error: #a9342d;
   --tw-color-focus: #2365d8;
+
+  /* M06 暗色设计令牌：与 AppShell / TaskDetailPage 的暗色铬一致。
+     供 @testweave/ui 组件及 M06 执行工作台消费。 */
+  --tw-bg: #0f172a;
+  --tw-surface: #161b26;
+  --tw-surface2: #222834;
+  --tw-panel: #161a21;
+  --tw-border: #2a2f3a;
+  --tw-border2: #3a424f;
+  --tw-text: #e6e8ec;
+  --tw-muted: #9aa3b2;
+  --tw-faint: #64748b;
+  --tw-accent: #5b7cfa;
+  --tw-accent-d: #3f5fd6;
+  --tw-pass: #4ade80;
+  --tw-fail: #f87171;
+  --tw-block: #fcd34d;
+  --tw-skip: #94a3b8;
 }
 
 .tw-status-panel {

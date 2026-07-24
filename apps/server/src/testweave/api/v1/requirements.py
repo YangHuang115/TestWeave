@@ -67,6 +67,7 @@ class RequirementResponse(BaseModel):
 # API Endpoints
 # ==============================================================================
 
+
 @router.post(
     "/versions/{versionId}/requirements",
     response_model=RequirementResponse,
@@ -93,7 +94,7 @@ def create_requirement(
         actor_id=str(current_user.id),
         request_id=request_id,
     )
-    
+
     # 2. 与版本做绑定
     RequirementService.associate_to_version(
         db,
@@ -137,10 +138,7 @@ def list_version_requirements(
     stmt = (
         select(Requirement)
         .join(VersionRequirement, VersionRequirement.requirement_id == Requirement.id)
-        .where(
-            Requirement.project_id == projectId,
-            VersionRequirement.version_id == versionId
-        )
+        .where(Requirement.project_id == projectId, VersionRequirement.version_id == versionId)
         .order_by(Requirement.created_at.desc())
     )
     return db.scalars(stmt).all()
@@ -278,9 +276,7 @@ async def download_attachment(
     return StreamingResponse(
         stream,
         media_type=content_type,
-        headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
-        }
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
     )
 
 

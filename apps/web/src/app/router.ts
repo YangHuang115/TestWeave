@@ -12,14 +12,20 @@ import VersionDetailPage from "../modules/versions/VersionDetailPage.vue";
 import RequirementDetailPage from "../modules/requirements/RequirementDetailPage.vue";
 import TasksPage from "../modules/tasks/TasksPage.vue";
 import TaskDetailPage from "../modules/tasks/TaskDetailPage.vue";
+import ExecutionWorkbench from "../modules/executions/components/ExecutionWorkbench.vue";
 import CasesPage from "../modules/cases/CasesPage.vue";
 import MindmapPage from "../modules/cases/MindmapPage.vue";
 import DefectsPage from "../modules/defects/DefectsPage.vue";
 import ReportsPage from "../modules/reports/ReportsPage.vue";
 import AgentCenterPage from "../modules/agent/AgentCenterPage.vue";
+import RunDetailsPage from "../modules/agent/RunDetailsPage.vue";
 import AdminSettingsPage from "../modules/admin/AdminSettingsPage.vue";
 import RepositorySettingsPage from "../modules/repository-settings/RepositorySettingsPage.vue";
 import ErrorPage from "../modules/foundation/ErrorPage.vue";
+import RequirementAnalysisPage from "../modules/ai-test-design/pages/RequirementAnalysisPage.vue";
+import TestPointsPage from "../modules/ai-test-design/pages/TestPointsPage.vue";
+import TestCasesPage from "../modules/ai-test-design/pages/TestCasesPage.vue";
+import CaseReviewPage from "../modules/ai-test-design/pages/CaseReviewPage.vue";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -46,14 +52,35 @@ export const router = createRouter({
           path: "versions/:versionId/requirements/:requirementId",
           component: RequirementDetailPage,
         },
-        { path: "tasks", redirect: (to) => `/projects/${to.params.projectId}/test-tasks` },
+        {
+          path: "tasks",
+          redirect: (to) => `/projects/${String(to.params.projectId)}/test-tasks`,
+        },
         { path: "test-tasks", component: TasksPage },
         { path: "test-tasks/:taskId", component: TaskDetailPage },
+        {
+          path: "test-tasks/:taskId/ai-design/requirement-analysis",
+          component: RequirementAnalysisPage,
+        },
+        {
+          path: "test-tasks/:taskId/ai-design/test-points",
+          component: TestPointsPage,
+        },
+        {
+          path: "test-tasks/:taskId/ai-design/test-cases",
+          component: TestCasesPage,
+        },
+        {
+          path: "test-tasks/:taskId/ai-design/case-review",
+          component: CaseReviewPage,
+        },
         { path: "test-tasks/:taskId/mindmap", component: MindmapPage },
+        { path: "test-tasks/:taskId/execution", component: ExecutionWorkbench },
         { path: "cases", component: CasesPage },
         { path: "defects", component: DefectsPage },
         { path: "reports", component: ReportsPage },
         { path: "agent", component: AgentCenterPage },
+        { path: "agent/runs/:runId", component: RunDetailsPage },
         { path: "repository-settings", component: RepositorySettingsPage },
         { path: "admin", component: AdminSettingsPage },
       ],
@@ -120,7 +147,16 @@ router.beforeEach(async (to, from, next) => {
       }
     }
 
-    // 5. 校验管理员与仓库配置页权限
+    // 5. 校验权限
+    if (to.path.includes("/agent")) {
+      const hasAgentPermission = projectStore.hasPermission("agent.use");
+      const isSystemAdmin = authStore.currentUser?.is_system_admin;
+      if (!hasAgentPermission && !isSystemAdmin) {
+        next("/403");
+        return;
+      }
+    }
+
     if (to.path.endsWith("/admin") || to.path.endsWith("/repository-settings")) {
       const isProjectAdmin = projectStore.memberRole === "project_admin";
       const isSystemAdmin = authStore.currentUser?.is_system_admin;

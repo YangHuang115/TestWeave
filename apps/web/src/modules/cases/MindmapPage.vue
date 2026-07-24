@@ -6,7 +6,7 @@
         <button class="btn-back" @click="goBack">← 返回任务</button>
         <span class="divider">|</span>
         <h3 class="mindmap-title">
-          {{ mindmap?.title || '测试用例脑图' }}
+          {{ mindmap?.title || "测试用例脑图" }}
         </h3>
         <span class="draft-badge" v-if="hasChanges">未保存</span>
       </div>
@@ -14,13 +14,13 @@
       <div class="header-actions">
         <!-- 明暗主题切换 -->
         <button class="btn btn-theme" @click="isDarkMode = !isDarkMode">
-          {{ isDarkMode ? '☀️ 切换浅色模式' : '🌙 切换暗黑模式' }}
+          {{ isDarkMode ? "☀️ 切换浅色模式" : "🌙 切换暗黑模式" }}
         </button>
         <button class="btn btn-save" @click="handleSave" :disabled="saving">
-          💾 {{ saving ? '正在保存...' : '保存脑图' }}
+          💾 {{ saving ? "正在保存..." : "保存脑图" }}
         </button>
         <button class="btn btn-sync" @click="handleSync" :disabled="syncing">
-          ⇄ {{ syncing ? '同步中...' : '一键同步为用例' }}
+          ⇄ {{ syncing ? "同步中..." : "一键同步为用例" }}
         </button>
       </div>
     </div>
@@ -75,12 +75,8 @@
             <span v-else class="node-topic">{{ node.topic }}</span>
           </div>
           <!-- 展开折叠控制小圆点 -->
-          <div
-            v-if="node.hasChildren"
-            class="collapse-dot"
-            @click.stop="toggleCollapse(node.id)"
-          >
-            {{ node.collapsed ? '+' : '-' }}
+          <div v-if="node.hasChildren" class="collapse-dot" @click.stop="toggleCollapse(node.id)">
+            {{ node.collapsed ? "+" : "-" }}
           </div>
         </div>
       </div>
@@ -230,7 +226,7 @@ function computeLayout(
   x: number,
   y: number,
   nodesList: RenderedNode[],
-  linesList: ConnectionLine[]
+  linesList: ConnectionLine[],
 ) {
   const hasChildren = !!node.children && node.children.length > 0;
   const collapsed = !!node.collapsed;
@@ -421,7 +417,7 @@ function findNodeById(node: MindNode, id: string): MindNode | null {
 
 function findParentInfo(
   rootNode: MindNode,
-  id: string
+  id: string,
 ): { parent: MindNode; index: number } | null {
   if (rootNode.children) {
     for (let i = 0; i < rootNode.children.length; i++) {
@@ -508,7 +504,9 @@ onUnmounted(() => {
   background: #f1f5f9; /* 默认浅色清爽模式底色 */
   color: #1e293b;
   user-select: none;
-  transition: background 0.25s ease, color 0.25s ease;
+  transition:
+    background 0.25s ease,
+    color 0.25s ease;
 }
 
 .mindmap-page.dark-mode {

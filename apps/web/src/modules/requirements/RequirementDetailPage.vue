@@ -254,17 +254,20 @@
               <div class="card-top">
                 <span class="task-no-lbl">{{ t.taskNo }}</span>
                 <span class="task-type-lbl" :class="t.taskType">
-                  {{ t.taskType === 'CASE_DESIGN' ? '设计' : '执行' }}
+                  {{ t.taskType === "CASE_DESIGN" ? "设计" : "执行" }}
                 </span>
                 <span class="task-status-lbl" :class="t.status.toLowerCase()">
                   {{ formatStatusText(t.status) }}
                 </span>
               </div>
-              <router-link :to="`/projects/${projectId}/test-tasks/${t.id}`" class="task-title-link">
+              <router-link
+                :to="`/projects/${projectId}/test-tasks/${t.id}`"
+                class="task-title-link"
+              >
                 {{ t.title }}
               </router-link>
               <div class="card-bottom">
-                <span class="lbl-owner">负责人: {{ t.ownerName || '未指定' }}</span>
+                <span class="lbl-owner">负责人: {{ t.ownerName || "未指定" }}</span>
                 <span class="lbl-date">截止: {{ formatDateShort(t.plannedEndAt) }}</span>
               </div>
             </div>
@@ -904,7 +907,7 @@ const formatStatusText = (s: string) => {
     BLOCKED: "已阻塞",
     COMPLETED: "已完成",
     CANCELLED: "已取消",
-    ARCHIVED: "已归档"
+    ARCHIVED: "已归档",
   };
   return statusMap[s] || s;
 };
@@ -1854,8 +1857,14 @@ onMounted(() => {
   border-radius: 3px;
   font-weight: 500;
 }
-.task-type-lbl.CASE_DESIGN { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.task-type-lbl.TEST_EXECUTION { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.task-type-lbl.CASE_DESIGN {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+.task-type-lbl.TEST_EXECUTION {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
 .task-status-lbl {
   font-size: 10.5px;
   padding: 1px 4px;
@@ -1863,13 +1872,34 @@ onMounted(() => {
   font-weight: 500;
   margin-left: auto;
 }
-.task-status-lbl.draft { background: rgba(100, 116, 139, 0.1); color: #94a3b8; }
-.task-status-lbl.ready { background: rgba(99, 102, 241, 0.1); color: #a5b4fc; }
-.task-status-lbl.in_progress { background: rgba(245, 158, 11, 0.1); color: #fbbf24; }
-.task-status-lbl.blocked { background: rgba(239, 68, 68, 0.1); color: #f87171; }
-.task-status-lbl.completed { background: rgba(16, 185, 129, 0.1); color: #34d399; }
-.task-status-lbl.cancelled { background: rgba(148, 163, 184, 0.1); color: #cbd5e1; }
-.task-status-lbl.archived { background: rgba(120, 113, 108, 0.1); color: #a8a29e; }
+.task-status-lbl.draft {
+  background: rgba(100, 116, 139, 0.1);
+  color: #94a3b8;
+}
+.task-status-lbl.ready {
+  background: rgba(99, 102, 241, 0.1);
+  color: #a5b4fc;
+}
+.task-status-lbl.in_progress {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+.task-status-lbl.blocked {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+.task-status-lbl.completed {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+}
+.task-status-lbl.cancelled {
+  background: rgba(148, 163, 184, 0.1);
+  color: #cbd5e1;
+}
+.task-status-lbl.archived {
+  background: rgba(120, 113, 108, 0.1);
+  color: #a8a29e;
+}
 .task-title-link {
   color: #f1f5f9;
   font-size: 13.5px;
@@ -1908,6 +1938,8 @@ onMounted(() => {
   font-size: 13px;
 }
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
