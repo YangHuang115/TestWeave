@@ -1,7 +1,7 @@
 protocol_version: "1.0"
 skill:
   id: "requirement-analysis"
-  version: "1.0.0"
+  version: "1.1.0"
   name: "TestWeave 需求分析"
   description: "分析需求范围、模块、规则、问题、风险和来源证据，生成待人工确认的结构化候选稿。"
   prompt: "prompt.md"

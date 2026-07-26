@@ -5,6 +5,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.orm import Session
 
+from tests.support.ai_skills import publish_workbench_skills
 from testweave.api.dependencies.auth import get_current_user
 from testweave.api.dependencies.database import get_db
 from testweave.api.v1.ai_test_design import get_runtime_settings
@@ -291,6 +292,11 @@ def _create_case_design_task(
         )
     )
     db.commit()
+    publish_workbench_skills(
+        db,
+        project_id=project.id,
+        user_id=user.id,
+    )
     return user, project, task, requirement
 
 

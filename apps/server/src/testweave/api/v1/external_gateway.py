@@ -1,7 +1,7 @@
 import uuid
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Header, Query, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,8 @@ from testweave.modules.ai_capability.external_agent.workbench_schemas import (
 from testweave.modules.ai_capability.external_agent.workspace_spec_service import (
     WorkspaceSpecService,
 )
+from testweave.modules.ai_capability.schemas import FileMapping
+from testweave.modules.ai_skill.service import SkillRegistryService
 
 router = APIRouter(prefix="/external/v1", tags=["External Agent Client Gateway v1"])
 READ_SCOPES = ["test_task.read", "requirement.read", "workspace:spec", "revision:candidate"]
@@ -384,6 +386,38 @@ async def sync_capability_draft(
         files_snapshot=body.filesSnapshot,
     )
     return result
+
+
+class SyncSkillDraftRequest(BaseModel):
+    files: list[FileMapping]
+
+
+@router.post("/skills/sync-draft", summary="外接 Agent 同步项目级 Skill 草稿版本")
+async def sync_skill_draft(
+    body: SyncSkillDraftRequest,
+    request: Request,
+    authorization: str | None = Header(None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise AppError(
+            code="INVALID_EXTERNAL_TOKEN",
+            message="缺少 Authorization Header 或 Token 格式错误",
+            status_code=401,
+        )
+
+    raw_token = authorization.removeprefix("Bearer ").strip()
+    token, user, _role, effective_scopes = ExternalAgentTokenService.authenticate_token(
+        db, raw_token
+    )
+    return SkillRegistryService.sync_draft(
+        db=db,
+        project_id=token.project_id,
+        user_id=user.id,
+        effective_scopes=effective_scopes,
+        files=body.files,
+        request_id=request.state.request_id,
+    )
 
 
 @router.get("/project", summary="外接 Agent 获取当前 Token 归属项目的信息")

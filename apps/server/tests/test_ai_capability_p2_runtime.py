@@ -208,6 +208,90 @@ async def test_executors_behavior() -> None:
     assert res4_continue.output == {"confirmed": True}
 
 
+@pytest.mark.anyio
+async def test_skill_executor_prefers_editable_prompt_and_keeps_legacy_fallback() -> None:
+    provider = FakeModelProvider(
+        {
+            "EDITABLE_PROMPT": {"source": "prompt.md"},
+            "LEGACY_SKILL": {"source": "SKILL.md"},
+        }
+    )
+    executor = SkillExecutor()
+    node_def = {
+        "type": "SKILL",
+        "skill": "requirement-analysis",
+        "output_schema": {
+            "type": "object",
+            "properties": {"source": {"type": "string"}},
+            "required": ["source"],
+            "additionalProperties": False,
+        },
+    }
+
+    preferred = await executor.execute(
+        node_id="requirement_analysis",
+        node_def=node_def,
+        resolved_input={"requirement": "demo"},
+        execution_snapshot={
+            "package_files": {
+                "skills/requirement-analysis/prompt.md": "EDITABLE_PROMPT",
+                "skills/requirement-analysis/SKILL.md": "LEGACY_SKILL",
+            }
+        },
+        provider=provider,
+    )
+    assert preferred.output == {"source": "prompt.md"}
+
+    legacy = await executor.execute(
+        node_id="requirement_analysis",
+        node_def=node_def,
+        resolved_input={"requirement": "demo"},
+        execution_snapshot={
+            "package_files": {
+                "skills/requirement-analysis/SKILL.md": "LEGACY_SKILL",
+            }
+        },
+        provider=provider,
+    )
+    assert legacy.output == {"source": "SKILL.md"}
+
+
+@pytest.mark.anyio
+async def test_skill_executor_validates_registered_input_schema_before_provider() -> None:
+    provider = FakeModelProvider({"EDITABLE_PROMPT": {"source": "prompt.md"}})
+    executor = SkillExecutor()
+
+    with pytest.raises(AppError) as exc_info:
+        await executor.execute(
+            node_id="requirement_analysis",
+            node_def={
+                "type": "SKILL",
+                "skill": "requirement-analysis",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"requirement": {"type": "object"}},
+                    "required": ["requirement"],
+                    "additionalProperties": False,
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {"source": {"type": "string"}},
+                    "required": ["source"],
+                    "additionalProperties": False,
+                },
+            },
+            resolved_input={"unexpected": "value"},
+            execution_snapshot={
+                "package_files": {
+                    "skills/requirement-analysis/prompt.md": "EDITABLE_PROMPT",
+                }
+            },
+            provider=provider,
+        )
+
+    assert exc_info.value.code == "RUN_INPUT_SCHEMA_INVALID"
+
+
 def test_snapshots_hash_calculation() -> None:
     data1 = {"a": 1, "b": 2}
     data2 = {"b": 2, "a": 1}

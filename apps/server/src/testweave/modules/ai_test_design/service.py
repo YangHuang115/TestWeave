@@ -170,7 +170,11 @@ class AiTestDesignService:
             return existing, False
 
         task, requirement = cls._get_task_and_requirement(db, project_id, task_id, lock_task=True)
-        capability = BuiltinAiTestDesignCapabilityService.ensure_published(db, actor_id)
+        capability = BuiltinAiTestDesignCapabilityService.ensure_published(
+            db,
+            actor_id=actor_id,
+            project_id=project_id,
+        )
         run_input = cls._build_run_input(db, task, requirement, review_mode)
         # 释放该任务下所有旧生成链轮次的活跃运行并发数，标记为成功，以释放运行并发限额并规避 RUN_BUDGET_EXCEEDED 限制
         from testweave.db.models import AICapabilityRun

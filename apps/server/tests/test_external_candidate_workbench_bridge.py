@@ -6,6 +6,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from tests.support.ai_skills import publish_workbench_skills
 from testweave.db.models import (
     AIArtifactSetRevision,
     AITestDesignRecord,
@@ -108,6 +109,11 @@ def workbench_bridge_context(db: Session, monkeypatch: pytest.MonkeyPatch) -> di
     db.add(ttr)
 
     db.commit()
+    publish_workbench_skills(
+        db,
+        project_id=project.id,
+        user_id=admin.id,
+    )
 
     token_obj, raw_token = ExternalAgentTokenService.create_token(
         db,

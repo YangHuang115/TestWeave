@@ -1,0 +1,23 @@
+# AI 测试设计流程定义（文件驱动，不硬编码在 Python 或服务器中）。
+# 阶段顺序、使用的 Skill、上游输入和人工确认点都在此声明；
+# 未来加入脑图等新 Skill 时只需增加一个阶段条目（stageKey）。
+capability: "ai-test-design"
+version: "1.0.0"
+allow_pause_resume: true
+stages:
+  - key: "requirement-analysis"
+    skill: "requirement-analysis"
+    input_from: "initial"
+    human_confirmation: true
+  - key: "test-point-generation"
+    skill: "test-point-generation"
+    input_from: "requirement-analysis"
+    human_confirmation: true
+  - key: "test-case-generation"
+    skill: "test-case-generation"
+    input_from: "test-point-generation"
+    human_confirmation: true
+  - key: "test-case-review"
+    skill: "test-case-review"
+    input_from: "test-case-generation"
+    human_confirmation: true

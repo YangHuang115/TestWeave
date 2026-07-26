@@ -40,6 +40,7 @@ from testweave.modules.ai_capability.runtime.snapshots import (
     calculate_json_hash,
 )
 from testweave.modules.ai_capability.runtime.state_machine import StateMachine
+from testweave.modules.ai_skill.service import SkillRegistryService
 
 
 class AIRuntimeService:
@@ -202,6 +203,20 @@ class AIRuntimeService:
         # 7. Workflow DAG 拓扑校验
         graph = WorkflowGraph(workflow_snapshot)
 
+        if cap.scope == "PROJECT":
+            runtime_materials = SkillRegistryService.resolve_runtime_materials(
+                db=db,
+                project_id=project_id,
+                capability_version_id=cap_version.id,
+                workflow_snapshot=workflow_snapshot,
+                capability_files=package.files_snapshot,
+            )
+        else:
+            runtime_materials = {
+                "packageFiles": package.files_snapshot,
+                "skillBindings": {},
+            }
+
         # 8. 校验输入 Schema
         input_schema = cap_version.input_schema or package.files_snapshot.get(
             "schemas/input.schema.json"
@@ -258,9 +273,10 @@ class AIRuntimeService:
             capability_version_id=str(cap_version.id),
             package_fingerprint=package.package_fingerprint,
             workflow_snapshot=workflow_snapshot,
-            package_files=package.files_snapshot,
+            package_files=runtime_materials["packageFiles"],
             model_provider_type="openai_compatible",
             model_name="quality_first",
+            skill_bindings=runtime_materials["skillBindings"],
         )
 
         trace_id = f"tr-{uuid.uuid4().hex[:16]}"

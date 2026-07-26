@@ -2,6 +2,7 @@
 .testweave/cache/
 .testweave/private-data/
 .testweave/output/
+runs/
 *.token
 *.secret
 __pycache__/

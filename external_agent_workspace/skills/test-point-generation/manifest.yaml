@@ -1,7 +1,7 @@
 protocol_version: "1.0"
 skill:
   id: "test-point-generation"
-  version: "1.0.0"
+  version: "1.1.0"
   name: "TestWeave 测试点生成"
   description: "根据已确认需求分析生成具备上游追踪关系的结构化测试点候选稿。"
   prompt: "prompt.md"

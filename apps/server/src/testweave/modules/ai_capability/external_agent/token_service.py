@@ -36,6 +36,10 @@ SUPPORTED_SCOPES: dict[str, dict[str, Any]] = {
         "description": "读取项目需求列表与关联需求正文文档",
         "min_role": "VIEWER",
     },
+    "skill:sync": {
+        "description": "同步项目级 AI Skill 草稿版本",
+        "min_role": "ADMIN",
+    },
 }
 
 ROLE_HIERARCHY = {
@@ -43,6 +47,14 @@ ROLE_HIERARCHY = {
     "EDITOR": 2,
     "ADMIN": 3,
     "OWNER": 4,
+}
+
+PROJECT_ROLE_TO_EXTERNAL_ROLE = {
+    "guest": "VIEWER",
+    "test_member": "EDITOR",
+    "test_lead": "ADMIN",
+    "project_admin": "ADMIN",
+    "owner": "OWNER",
 }
 
 
@@ -205,8 +217,10 @@ class ExternalAgentTokenService:
                     message="Token 关联用户已不在该项目中，权限失效",
                     status_code=403,
                 )
-            role_str = member.role_id.removeprefix("project_").upper()
-            user_role = role_str
+            user_role = PROJECT_ROLE_TO_EXTERNAL_ROLE.get(
+                member.role_id,
+                member.role_id.removeprefix("project_").upper(),
+            )
 
         user_role_level = ROLE_HIERARCHY.get(user_role, 0)
         if user_role_level < 1:

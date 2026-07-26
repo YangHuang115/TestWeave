@@ -7,9 +7,7 @@ from testweave.modules.ai_capability.external_agent.artifact_schema_validator im
     WORKBENCH_TEST_POINT_SET_SCHEMA_V1,
 )
 
-BUILTIN_CAPABILITY_NAMESPACE = "testweave.official"
 BUILTIN_CAPABILITY_CODE = "ai_test_design_workbench"
-BUILTIN_CAPABILITY_VERSION = "1.0.0"
 
 STAGE_DEFINITIONS: dict[str, dict[str, str]] = {
     "requirement-analysis": {
@@ -131,14 +129,6 @@ BUILTIN_INPUT_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
-REQUIREMENT_ANALYSIS_INSTRUCTIONS = """你是 TestWeave 需求分析智能体。只依据输入中的需求、任务与附件来源元数据生成结构化分析，不得虚构已确认事实。把未明确内容放入 inferences 或 questions；会阻塞测试设计的问题必须标记 blocking=true。每条规则、风险与关系都要使用 evidenceRefs 建立来源追踪。输出必须符合 requirement_analysis@1.0 Schema。"""
-
-TEST_POINT_INSTRUCTIONS = """你是 TestWeave 测试点设计智能体。只使用服务端提供的、已经人工接受的需求分析完整集合生成测试点。测试点必须可独立追踪到规则、问题与模块关系；测试方法要写明选择原因。allowCaseGeneration 默认由风险与可执行性判断，但最终选择权属于用户。输出必须符合 test_point_set@1.0 Schema。"""
-
-TEST_CASE_INSTRUCTIONS = """你是 TestWeave 测试用例设计智能体。只为人工确认 allowCaseGeneration=true 的测试点生成用例。每条用例只能有一个 primaryTestPointRef 和一个 coreExpected；步骤必须包含可执行动作及对应可观察预期，测试数据要具体。输出必须符合 test_case_set@1.0 Schema。"""
-
-CASE_REVIEW_INSTRUCTIONS = """你是 TestWeave 用例评审智能体。按输入的 TRACEABLE 或 INTRINSIC 模式评审已人工接受的完整用例集合。Finding 必须定位到具体 fieldPath，提供证据和定向建议；评审只生成报告和修订请求，绝不能直接改写用例。输出必须符合 test_case_review_report@1.0 Schema。"""
-
 
 def _projection(collection_pointer: str, artifact_type: str) -> dict[str, Any]:
     return {
@@ -232,17 +222,4 @@ BUILTIN_WORKFLOW: dict[str, Any] = {
             "decision_schema": HUMAN_DECISION_SCHEMA,
         },
     }
-}
-
-BUILTIN_PACKAGE_FILES: dict[str, Any] = {
-    "workflow.json": BUILTIN_WORKFLOW,
-    "schemas/input.schema.json": BUILTIN_INPUT_SCHEMA,
-    "schemas/requirement_analysis.schema.json": REQUIREMENT_ANALYSIS_SCHEMA_V1,
-    "schemas/test_point_set.schema.json": WORKBENCH_TEST_POINT_SET_SCHEMA_V1,
-    "schemas/test_case_set.schema.json": WORKBENCH_TEST_CASE_SET_SCHEMA_V1,
-    "schemas/test_case_review_report.schema.json": TEST_CASE_REVIEW_REPORT_SCHEMA_V1,
-    "skills/requirement-analysis/SKILL.md": REQUIREMENT_ANALYSIS_INSTRUCTIONS,
-    "skills/test-point-generation/SKILL.md": TEST_POINT_INSTRUCTIONS,
-    "skills/test-case-generation/SKILL.md": TEST_CASE_INSTRUCTIONS,
-    "skills/test-case-review/SKILL.md": CASE_REVIEW_INSTRUCTIONS,
 }

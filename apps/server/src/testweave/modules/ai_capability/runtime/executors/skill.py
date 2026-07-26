@@ -5,6 +5,9 @@ import jsonschema
 from testweave.core.errors import AppError
 from testweave.modules.ai_capability.runtime.executors.base import BaseExecutor, ExecutorResult
 from testweave.modules.ai_capability.runtime.provider import ModelProvider
+from testweave.modules.ai_capability.runtime.skill_instructions import (
+    resolve_skill_instructions,
+)
 
 
 class SkillExecutor(BaseExecutor):
@@ -23,12 +26,27 @@ class SkillExecutor(BaseExecutor):
 
         # 获取配置与 manifest 对应 instructions 文件
         skill_name = node_def.get("skill", "")
-        instructions_path = f"skills/{skill_name}/SKILL.md" if skill_name else "SKILL.md"
-        instructions = (
-            package_files.get(instructions_path)
-            or package_files.get("SKILL.md")
-            or "You are an AI assistant."
+        instructions = resolve_skill_instructions(package_files, skill_name)
+        input_data = (
+            resolved_input if isinstance(resolved_input, dict) else {"input": resolved_input}
         )
+
+        input_schema = node_def.get("input_schema")
+        if input_schema:
+            try:
+                jsonschema.validate(instance=input_data, schema=input_schema)
+            except jsonschema.ValidationError as exc:
+                raise AppError(
+                    code="RUN_INPUT_SCHEMA_INVALID",
+                    message=f"Skill 输入校验 Schema 失败: {exc.message}",
+                    status_code=400,
+                ) from exc
+            except jsonschema.SchemaError as exc:
+                raise AppError(
+                    code="RUN_CAPABILITY_NOT_RUNNABLE",
+                    message=f"Skill 输入 Schema 非法: {exc.message}",
+                    status_code=400,
+                ) from exc
 
         # 获取输出 Schema
         output_schema = node_def.get("output_schema") or {
@@ -42,9 +60,7 @@ class SkillExecutor(BaseExecutor):
         # 调用模型
         res = await provider.invoke_structured_json(
             instructions=instructions,
-            input_data=resolved_input
-            if isinstance(resolved_input, dict)
-            else {"input": resolved_input},
+            input_data=input_data,
             output_schema=output_schema,
             model_policy=model_policy,
         )

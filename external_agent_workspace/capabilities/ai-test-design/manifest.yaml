@@ -1,0 +1,7 @@
+protocol_version: "1.0"
+capability:
+  id: "ai-test-design"
+  version: "1.0.0"
+  name: "AI 测试设计"
+  description: "从需求分析到测试用例评审的本地优先链式测试设计流程。"
+  workflow: "workflow.yaml"

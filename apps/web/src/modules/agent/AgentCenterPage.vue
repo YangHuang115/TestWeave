@@ -504,6 +504,10 @@
                 <input type="checkbox" value="revision:publish_request" v-model="newTokenScopes" />
                 <span><code>revision:publish_request</code> (发起发布评审请求)</span>
               </label>
+              <label class="checkbox-label">
+                <input type="checkbox" value="skill:sync" v-model="newTokenScopes" />
+                <span><code>skill:sync</code> (同步项目级 AI Skill 草稿版本)</span>
+              </label>
             </div>
           </div>
         </div>

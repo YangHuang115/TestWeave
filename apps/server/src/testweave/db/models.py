@@ -732,6 +732,193 @@ class TestCaseMindmap(Base):
 # ----------------------------------------------------------------------
 
 
+class AISkill(Base):
+    """项目级 AI Skill 稳定身份。"""
+
+    __tablename__ = "ai_skills"
+    __table_args__ = (
+        UniqueConstraint("project_id", "code", name="uq_ai_skills_project_code"),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'ARCHIVED')",
+            name="ck_ai_skills_status_values",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE", name="fk_ai_skills_project_id_projects"),
+        nullable=False,
+        index=True,
+    )
+    maintainer_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+            name="fk_ai_skills_maintainer_id_users",
+        ),
+        nullable=True,
+    )
+    code: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")
+    current_published_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "ai_skill_versions.id",
+            ondelete="RESTRICT",
+            name="fk_ai_skills_current_published_version_id",
+            use_alter=True,
+        ),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+    project: Mapped["Project"] = relationship()
+    maintainer: Mapped["User | None"] = relationship(foreign_keys=[maintainer_id])
+    current_published_version: Mapped["AISkillVersion | None"] = relationship(
+        foreign_keys=[current_published_version_id],
+        post_update=True,
+    )
+
+
+class AISkillVersion(Base):
+    """项目级 AI Skill 的不可变版本快照。"""
+
+    __tablename__ = "ai_skill_versions"
+    __table_args__ = (
+        UniqueConstraint("skill_id", "version", name="uq_ai_skill_versions_skill_version"),
+        CheckConstraint(
+            "status IN ('SYNCED_DRAFT', 'PUBLISHED', 'REJECTED', 'DEPRECATED')",
+            name="ck_ai_skill_versions_status_values",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    skill_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "ai_skills.id",
+            ondelete="CASCADE",
+            name="fk_ai_skill_versions_skill_id_ai_skills",
+        ),
+        nullable=False,
+        index=True,
+    )
+    version: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="SYNCED_DRAFT")
+    package_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    manifest_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    input_schema: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    output_schema: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    model_policy: Mapped[str] = mapped_column(String(50), nullable=False)
+    allowed_tools: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    required_permissions: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    side_effect_level: Mapped[str] = mapped_column(String(10), nullable=False)
+    created_source: Mapped[str] = mapped_column(String(50), nullable=False, default="EXTERNAL_SYNC")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_ai_skill_versions_created_by_users"),
+        nullable=True,
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    skill: Mapped["AISkill"] = relationship(foreign_keys=[skill_id])
+    creator: Mapped["User | None"] = relationship()
+
+
+class AISkillPackage(Base):
+    """AI Skill 版本的完整文件归档快照。"""
+
+    __tablename__ = "ai_skill_packages"
+    __table_args__ = (
+        UniqueConstraint("skill_version_id", name="uq_ai_skill_packages_skill_version_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    skill_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "ai_skill_versions.id",
+            ondelete="CASCADE",
+            name="fk_ai_skill_packages_skill_version_id",
+        ),
+        nullable=False,
+    )
+    package_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    validation_report: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    files_snapshot: Mapped[dict[str, str]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    skill_version: Mapped["AISkillVersion"] = relationship()
+
+
+class AICapabilitySkillBinding(Base):
+    """能力版本工作流节点到不可变 Skill 版本的绑定。"""
+
+    __tablename__ = "ai_capability_skill_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "capability_version_id",
+            "node_id",
+            name="uq_ai_capability_skill_bindings_capability_node",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    capability_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "ai_capability_versions.id",
+            ondelete="CASCADE",
+            name="fk_ai_capability_skill_bindings_capability_version_id",
+        ),
+        nullable=False,
+        index=True,
+    )
+    node_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    skill_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "ai_skill_versions.id",
+            ondelete="RESTRICT",
+            name="fk_ai_capability_skill_bindings_skill_version_id",
+        ),
+        nullable=False,
+        index=True,
+    )
+    package_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    capability_version: Mapped["AICapabilityVersion"] = relationship()
+    skill_version: Mapped["AISkillVersion"] = relationship()
+
+
 class AICapability(Base):
     """AI 能力实体表。"""
 

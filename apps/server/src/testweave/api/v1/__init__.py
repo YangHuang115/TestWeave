@@ -6,6 +6,7 @@ from testweave.api.v1.ai_evaluations import router as ai_evaluations_router
 from testweave.api.v1.ai_packages import router as ai_packages_router
 from testweave.api.v1.ai_releases import router as ai_releases_router
 from testweave.api.v1.ai_runs import router as ai_runs_router
+from testweave.api.v1.ai_skills import router as ai_skills_router
 from testweave.api.v1.ai_test_design import router as ai_test_design_router
 from testweave.api.v1.auth import router as auth_router
 from testweave.api.v1.case_modules import router as case_modules_router
@@ -31,6 +32,7 @@ v1_router.include_router(case_modules_router)
 v1_router.include_router(test_cases_router)
 v1_router.include_router(ai_capabilities_router)
 v1_router.include_router(ai_runs_router)
+v1_router.include_router(ai_skills_router)
 v1_router.include_router(ai_test_design_router)
 v1_router.include_router(ai_capability_revision_router)
 v1_router.include_router(test_executions_router)

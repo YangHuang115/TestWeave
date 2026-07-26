@@ -41,6 +41,9 @@ from testweave.modules.ai_capability.runtime.provider import (
     ModelProvider,
     OpenAICompatibleProviderAdapter,
 )
+from testweave.modules.ai_capability.runtime.skill_instructions import (
+    resolve_skill_instructions,
+)
 from testweave.modules.ai_capability.runtime.snapshots import calculate_json_hash
 from testweave.modules.ai_capability.runtime.state_machine import StateMachine
 
@@ -667,10 +670,7 @@ class AIRuntimeWorker:
             )
             skill_name = node_def.get("skill", "")
             package_files = run.execution_snapshot.get("package_files", {})
-            skill_path = f"skills/{skill_name}/SKILL.md" if skill_name else "SKILL.md"
-            base_instructions = package_files.get(skill_path) or package_files.get(
-                "SKILL.md", "You are an AI assistant."
-            )
+            base_instructions = resolve_skill_instructions(package_files, skill_name)
             instructions = (
                 f"{base_instructions}\n\n"
                 "这是局部重生成。只能返回 replacements 中列出的目标项；每个 targetRef "

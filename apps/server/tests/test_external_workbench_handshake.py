@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from tests.support.ai_skills import publish_workbench_skills
 from testweave.api.dependencies.database import get_db
 from testweave.core.readiness import NotConfiguredReadinessProbe
 from testweave.db.models import (
@@ -238,6 +239,11 @@ def workbench_handshake_context(db: Session) -> dict[str, Any]:
         )
     )
     db.commit()
+    publish_workbench_skills(
+        db,
+        project_id=project.id,
+        user_id=user.id,
+    )
 
     return {
         "user": user,

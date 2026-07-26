@@ -19,9 +19,10 @@ class ExecutionSnapshotBuilder:
         capability_version_id: str,
         package_fingerprint: str,
         workflow_snapshot: dict[str, Any],
-        package_files: dict[str, str],
+        package_files: dict[str, Any],
         model_provider_type: str,
         model_name: str,
+        skill_bindings: dict[str, dict[str, str]] | None = None,
     ) -> tuple[dict[str, Any], str]:
         snapshot = {
             "capability_id": str(capability_id),
@@ -33,7 +34,9 @@ class ExecutionSnapshotBuilder:
                 "provider_type": model_provider_type,
                 "model_name": model_name,
             },
-            "registry_version": "v1",
+            "registry_version": "v2" if skill_bindings else "v1",
         }
+        if skill_bindings:
+            snapshot["skill_bindings"] = skill_bindings
         snapshot_hash = calculate_json_hash(snapshot)
         return snapshot, snapshot_hash
