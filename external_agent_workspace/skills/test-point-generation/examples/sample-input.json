@@ -1,0 +1,46 @@
+{
+  "acceptedRequirementAnalysis": {
+    "acceptedSetRevisionId": "revision-analysis-1",
+    "acceptedSetHash": "hash-analysis-1",
+    "acceptedItems": [
+      {
+        "schemaVersion": "1.0",
+        "stableKey": "analysis-login-lockout",
+        "questions": []
+      }
+    ],
+    "decisionSnapshot": {
+      "questions": []
+    }
+  },
+  "originalContext": {
+    "task": {
+      "id": "task-login",
+      "taskNo": "TASK-DEMO-001",
+      "title": "账号登录锁定测试设计"
+    },
+    "requirement": {
+      "id": "requirement-login",
+      "requirementNo": "REQ-DEMO-001",
+      "title": "账号登录锁定"
+    },
+    "attachments": [],
+    "reviewMode": "TRACEABLE"
+  },
+  "acceptedUpstreamContext": {
+    "requirement_analysis": [
+      {
+        "schemaVersion": "1.0",
+        "stableKey": "analysis-login-lockout",
+        "questions": []
+      }
+    ]
+  },
+  "acceptedUpstreamManifest": {
+    "requirement_analysis": {
+      "set_revision_id": "revision-analysis-1",
+      "set_hash": "hash-analysis-1",
+      "item_count": 1
+    }
+  }
+}

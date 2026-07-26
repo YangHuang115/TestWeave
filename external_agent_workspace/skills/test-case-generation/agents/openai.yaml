@@ -1,0 +1,4 @@
+interface:
+  display_name: "TestWeave 测试用例生成"
+  short_description: "基于已确认测试点生成带步骤、数据和预期的结构化候选用例"
+  default_prompt: "Use $test-case-generation to generate structured candidate test cases from accepted test points."

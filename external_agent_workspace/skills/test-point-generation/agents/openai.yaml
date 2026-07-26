@@ -1,0 +1,4 @@
+interface:
+  display_name: "TestWeave 测试点生成"
+  short_description: "基于已确认的需求分析生成可追踪、可评审的结构化测试点"
+  default_prompt: "Use $test-point-generation to generate traceable test points from the accepted requirement analysis."

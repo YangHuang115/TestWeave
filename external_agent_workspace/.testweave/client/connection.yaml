@@ -1,0 +1,4 @@
+connection:
+  base_url: http://127.0.0.1:8787
+  token_env: TESTWEAVE_AGENT_TOKEN
+  timeout_seconds: 60

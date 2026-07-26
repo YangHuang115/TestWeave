@@ -39,6 +39,29 @@ python external_agent_workspace/run_agent.py
 python external_agent_workspace/run_agent.py "继续处理 TASK-000001 的测试点生成"
 ```
 
+## 四个可编辑 Skill
+
+四个 Skill 的唯一可编辑源位于当前仓库的 `skills/`：
+
+| 目录 | 职责 |
+| --- | --- |
+| `skills/requirement-analysis/` | 需求分析 |
+| `skills/test-point-generation/` | 测试点生成 |
+| `skills/test-case-generation/` | 测试用例生成 |
+| `skills/test-case-review/` | 测试用例评审 |
+
+每个目录中的 `SKILL.md` 是 Agent 发现入口，`prompt.md` 是 TestWeave Runtime 使用的模型指令，`manifest.yaml` 和两个 JSON Schema 是服务器注册契约。修改已同步版本时必须先提升 `manifest.yaml` 中的版本号并更新 `CHANGELOG.md`，不能用同一版本覆盖旧内容。
+
+`.agents/skills/`、`.claude/skills/` 和 `.agent/skills/` 只包含指向上述目录的相对软链接，因此 Codex、Claude Code 和兼容 Agent 读取的是同一份源文件。
+
+本地 Agent 直接使用 Skill 不需要服务器注册。要让 TestWeave 工作台调用，具备 `agent.manage` 权限的 `test_lead` 或 `project_admin` 需要创建包含 `skill:sync` Scope 的外接 Token，然后显式同步：
+
+```bash
+python external_agent_workspace/run_agent.py --sync-skills
+```
+
+同步只创建 `SYNCED_DRAFT` 版本，不能自动发布。具备项目 `agent.manage` 权限的用户审核后，通过 TestWeave Skill 发布 API 发布；四个 Skill 都发布后，新建的 AI 测试设计记录才会绑定它们。服务器不会监听或修改本地 `skills/` 目录。
+
 ## 安全约束（重要）
 
 - Gateway 的 `8787` 端口**仅绑定回环地址**（`127.0.0.1` / `::1`），拒绝绑定公网网卡（`0.0.0.0`）。因此外接 Agent 必须与 TestWeave 服务端**运行在同一台机器**上。
@@ -60,11 +83,19 @@ curl -X POST http://127.0.0.1:8787/external/v1/revision/candidates \
   -H "Authorization: Bearer tw_ext_你的token" \
   -H "Content-Type: application/json" \
   -d '{"capabilityId":"<CAPABILITY_ID>","artifactType":"test_point_set@1.0","payload":{"points":[{"title":"新测试点"}]},"summary":"External CLI Agent Submission"}'
+
+# 同步单个 Skill 草稿（Token 需要 skill:sync）
+curl -X POST http://127.0.0.1:8787/external/v1/skills/sync-draft \
+  -H "Authorization: Bearer tw_ext_你的token" \
+  -H "Content-Type: application/json" \
+  -d '{"files":[{"path":"manifest.yaml","content":"..."}]}'
 ```
 
 ## 目录内其他文件说明
 
 - `AGENTS.md` / `CLAUDE.md`：外部 Agent 的操作指令，供 Agent 运行参考。
+- `skills/`：四个可见、可编辑、可版本化的 AI 测试设计 Skill 源文件。
+- `.agents/skills/`、`.claude/skills/`、`.agent/skills/`：指向 `skills/` 的激活链接，不是副本。
 - `.testweave/`：**未随本仓库发布**。仅当你要用自有的 Claude Code / Codex / 通用 Agent 对接 Gateway 时才需要（适配器说明、客户端配置、结构化 Schema）；本基础客户端 `run_agent.py` 不依赖它。
 - `.env.example`：配置模板（已发布）；`.env.local` 为本地密钥，**不要提交**。
 

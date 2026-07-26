@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0",
+  "stableKey": "analysis-login-lockout",
+  "goal": "验证账号在连续 5 次密码错误后被锁定 30 分钟",
+  "inScope": [
+    "错误密码计数",
+    "账号锁定",
+    "锁定时长"
+  ],
+  "outOfScope": [
+    "找回密码"
+  ],
+  "modules": [
+    {
+      "id": "module-auth",
+      "title": "认证",
+      "description": "处理登录校验与账号锁定"
+    }
+  ],
+  "moduleRelations": [],
+  "rules": [
+    {
+      "id": "rule-lock-after-five",
+      "description": "同一账号连续输入错误密码 5 次后锁定 30 分钟",
+      "evidenceRefs": [
+        "evidence-requirement"
+      ]
+    }
+  ],
+  "inferences": [],
+  "questions": [
+    {
+      "id": "question-reset-counter",
+      "question": "一次成功登录是否重置错误密码计数？",
+      "blocking": true,
+      "status": "PENDING",
+      "answer": "",
+      "decisionReason": "",
+      "scope": "IN_SCOPE"
+    }
+  ],
+  "risks": [
+    {
+      "id": "risk-concurrent-attempts",
+      "title": "并发登录导致计数不一致",
+      "description": "并发错误请求可能绕过第五次锁定规则",
+      "level": "HIGH",
+      "testSignals": [
+        "锁定前后错误计数",
+        "第五次请求后的账号状态"
+      ],
+      "evidenceRefs": [
+        "evidence-requirement"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "evidence-requirement",
+      "sourceType": "REQUIREMENT",
+      "sourceRef": "REQ-DEMO-001",
+      "quote": "连续输入错误密码 5 次后锁定 30 分钟"
+    }
+  ]
+}

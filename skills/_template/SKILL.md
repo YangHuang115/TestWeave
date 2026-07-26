@@ -1,8 +1,6 @@
 ---
 name: replace-with-skill-name
 description: TODO：一句话说明单一职责和触发场景
-version: 0.1.0
-status: template
 ---
 
 # Skill 名称
@@ -25,8 +23,7 @@ status: template
 
 ## 版本
 
-- Skill 版本：`0.1.0`
-- Prompt 版本：TODO
+- Skill 版本：以 `manifest.yaml` 为准
 - 输入 Schema：`input.schema.json`
 - 输出 Schema：`output.schema.json`
 

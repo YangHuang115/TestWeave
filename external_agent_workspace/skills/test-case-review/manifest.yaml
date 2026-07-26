@@ -1,0 +1,15 @@
+protocol_version: "1.0"
+skill:
+  id: "test-case-review"
+  version: "1.0.0"
+  name: "TestWeave 测试用例评审"
+  description: "评审候选测试用例并输出字段级发现、覆盖结论和待人工确认的修订请求。"
+  prompt: "prompt.md"
+  input_schema: "input.schema.json"
+  output_schema: "output.schema.json"
+  model_policy: "quality_first"
+  allowed_tools: []
+  required_permissions:
+    - "project.read"
+    - "requirement.read"
+  side_effect_level: "L1"

@@ -1,0 +1,15 @@
+protocol_version: "1.0"
+skill:
+  id: "test-point-generation"
+  version: "1.0.0"
+  name: "TestWeave 测试点生成"
+  description: "根据已确认需求分析生成具备上游追踪关系的结构化测试点候选稿。"
+  prompt: "prompt.md"
+  input_schema: "input.schema.json"
+  output_schema: "output.schema.json"
+  model_policy: "quality_first"
+  allowed_tools: []
+  required_permissions:
+    - "project.read"
+    - "requirement.read"
+  side_effect_level: "L1"

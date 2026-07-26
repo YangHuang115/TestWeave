@@ -4,3 +4,5 @@
 .testweave/output/
 *.token
 *.secret
+__pycache__/
+*.pyc

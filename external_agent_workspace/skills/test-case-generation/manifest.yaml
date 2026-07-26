@@ -1,0 +1,15 @@
+protocol_version: "1.0"
+skill:
+  id: "test-case-generation"
+  version: "1.0.0"
+  name: "TestWeave 测试用例生成"
+  description: "根据已确认测试点生成带步骤、数据、预期和追踪引用的结构化候选用例。"
+  prompt: "prompt.md"
+  input_schema: "input.schema.json"
+  output_schema: "output.schema.json"
+  model_policy: "quality_first"
+  allowed_tools: []
+  required_permissions:
+    - "project.read"
+    - "requirement.read"
+  side_effect_level: "L1"

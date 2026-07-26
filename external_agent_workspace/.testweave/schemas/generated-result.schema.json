@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://testweave.local/schemas/generated-result.schema.json",
+  "title": "External Generated Result Submission",
+  "type": "object",
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "project_id",
+    "source_refs",
+    "base_context_hash",
+    "idempotency_key",
+    "data",
+    "execution_metadata"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "base_revision_id": {
+      "type": "string"
+    },
+    "base_revision_set_id": {
+      "type": "string"
+    },
+    "base_context_hash": {
+      "type": "string",
+      "pattern": "^sha256:"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 8
+    },
+    "data": {},
+    "source_references": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "execution_metadata": {
+      "type": "object",
+      "required": [
+        "client_name",
+        "agent_host"
+      ],
+      "properties": {
+        "client_name": {
+          "type": "string"
+        },
+        "agent_host": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "skill_version": {
+          "type": "string"
+        },
+        "workspace_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "anyOf": [
+    {
+      "required": [
+        "base_revision_id"
+      ]
+    },
+    {
+      "required": [
+        "base_revision_set_id"
+      ]
+    }
+  ],
+  "additionalProperties": false
+}

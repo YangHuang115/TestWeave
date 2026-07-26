@@ -1,0 +1,21 @@
+{
+  "task": {
+    "id": "task-login",
+    "taskNo": "TASK-DEMO-001",
+    "title": "账号登录锁定测试设计",
+    "description": "验证登录失败与账号锁定规则。",
+    "testGoal": "覆盖锁定阈值和恢复时间",
+    "excludedScope": null
+  },
+  "requirement": {
+    "id": "requirement-login",
+    "requirementNo": "REQ-DEMO-001",
+    "title": "账号登录锁定",
+    "description": "同一账号连续输入错误密码 5 次后锁定 30 分钟。",
+    "acceptanceCriteria": "第 5 次失败后拒绝继续登录，30 分钟后恢复。",
+    "priority": "P1",
+    "updatedAt": "2026-07-26T08:00:00Z"
+  },
+  "attachments": [],
+  "reviewMode": "TRACEABLE"
+}

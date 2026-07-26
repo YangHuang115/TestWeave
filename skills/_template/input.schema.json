@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://testweave.local/schemas/skills/template/input.schema.json",
   "title": "TestWeave Skill Template Input",
   "description": "复制模板后替换标题、ID、字段和约束。",

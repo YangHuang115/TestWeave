@@ -1,0 +1,66 @@
+{
+  "acceptedTestCases": {
+    "acceptedSetRevisionId": "revision-cases-1",
+    "acceptedSetHash": "hash-cases-1",
+    "acceptedItems": [
+      {
+        "stableKey": "case-lock-on-fifth-failure",
+        "primaryTestPointRef": "point-lock-on-fifth-failure"
+      }
+    ],
+    "decisionSnapshot": {
+      "accepted": true
+    }
+  },
+  "reviewMode": "TRACEABLE",
+  "originalContext": {
+    "task": {
+      "id": "task-login",
+      "taskNo": "TASK-DEMO-001",
+      "title": "账号登录锁定测试设计"
+    },
+    "requirement": {
+      "id": "requirement-login",
+      "requirementNo": "REQ-DEMO-001",
+      "title": "账号登录锁定"
+    },
+    "attachments": [],
+    "reviewMode": "TRACEABLE"
+  },
+  "acceptedUpstreamContext": {
+    "requirement_analysis": [
+      {
+        "schemaVersion": "1.0",
+        "stableKey": "analysis-login-lockout"
+      }
+    ],
+    "test_points": [
+      {
+        "stableKey": "point-lock-on-fifth-failure"
+      }
+    ],
+    "test_cases": [
+      {
+        "stableKey": "case-lock-on-fifth-failure",
+        "primaryTestPointRef": "point-lock-on-fifth-failure"
+      }
+    ]
+  },
+  "acceptedUpstreamManifest": {
+    "requirement_analysis": {
+      "set_revision_id": "revision-analysis-1",
+      "set_hash": "hash-analysis-1",
+      "item_count": 1
+    },
+    "test_points": {
+      "set_revision_id": "revision-points-1",
+      "set_hash": "hash-points-1",
+      "item_count": 1
+    },
+    "test_cases": {
+      "set_revision_id": "revision-cases-1",
+      "set_hash": "hash-cases-1",
+      "item_count": 1
+    }
+  }
+}

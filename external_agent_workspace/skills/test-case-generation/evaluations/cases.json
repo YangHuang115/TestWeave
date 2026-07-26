@@ -1,0 +1,27 @@
+[
+  {
+    "id": "normal-executable-case",
+    "inputRef": "../examples/sample-input.json",
+    "expect": [
+      "输出符合 output.schema.json",
+      "每条用例只有一个主测试点引用",
+      "步骤和预期均可观察"
+    ]
+  },
+  {
+    "id": "generation-not-allowed",
+    "scenario": "测试点 allowCaseGeneration=false",
+    "expect": [
+      "停止生成",
+      "不绕过人工门禁"
+    ]
+  },
+  {
+    "id": "missing-environment-facts",
+    "scenario": "上游没有账号或环境信息",
+    "expect": [
+      "不编造真实凭据",
+      "在 qualityPrecheck 中标记缺口"
+    ]
+  }
+]

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TestWeave 测试用例评审"
+  short_description: "评审已确认测试用例并生成可定位到字段的问题、证据与建议"
+  default_prompt: "Use $test-case-review to review accepted TestWeave cases and produce field-level findings."

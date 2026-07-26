@@ -1,0 +1,4 @@
+interface:
+  display_name: "TestWeave 需求分析"
+  short_description: "分析 TestWeave 需求范围、业务规则、问题、风险与来源证据"
+  default_prompt: "Use $requirement-analysis to analyze the selected TestWeave requirement and submit a structured candidate."

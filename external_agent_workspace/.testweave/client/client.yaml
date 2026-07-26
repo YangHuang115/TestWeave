@@ -1,0 +1,11 @@
+client:
+  name: testweave-external-agent
+  type: external-agent
+  host: codex
+
+behavior:
+  default_language: zh-CN
+  generated_content_status: candidate
+  allow_capability_run: true
+  allow_draft_write: true
+  allow_formal_publish: false

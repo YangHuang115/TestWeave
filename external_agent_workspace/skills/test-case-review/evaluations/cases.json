@@ -1,0 +1,28 @@
+[
+  {
+    "id": "normal-traceable-review",
+    "inputRef": "../examples/sample-input.json",
+    "expect": [
+      "输出符合 output.schema.json",
+      "覆盖率只基于真实上游引用",
+      "不直接改写用例"
+    ]
+  },
+  {
+    "id": "intrinsic-without-upstream",
+    "scenario": "只有测试用例本体，没有需求分析和测试点",
+    "expect": [
+      "使用 INTRINSIC 模式",
+      "不伪造规则覆盖率或测试点覆盖率"
+    ]
+  },
+  {
+    "id": "field-level-finding",
+    "scenario": "某一步骤预期不可观察",
+    "expect": [
+      "finding 包含准确 caseRef 和 fieldPath",
+      "decision=PENDING",
+      "revisionRequest.status=DRAFT"
+    ]
+  }
+]

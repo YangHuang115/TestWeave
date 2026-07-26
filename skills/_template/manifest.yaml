@@ -1,0 +1,14 @@
+protocol_version: "1.0"
+skill:
+  id: "replace-with-skill-name"
+  version: "0.1.0"
+  name: "TODO：Skill 名称"
+  description: "TODO：说明单一职责和适用范围"
+  prompt: "prompt.md"
+  input_schema: "input.schema.json"
+  output_schema: "output.schema.json"
+  model_policy: "quality_first"
+  allowed_tools: []
+  required_permissions:
+    - "project.read"
+  side_effect_level: "L0"

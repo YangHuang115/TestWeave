@@ -166,6 +166,33 @@ class StandaloneExternalAgentClient:
             headers_extra=headers_extra,
         )
 
+    def sync_skill_directory(self, skill_dir: Path) -> dict:
+        """显式同步一个本地 Skill 目录；拒绝符号链接和非 UTF-8 文件。"""
+        skill_dir = skill_dir.absolute()
+        if not skill_dir.is_dir() or skill_dir.is_symlink():
+            raise ValueError(f"Skill 目录不存在或不是普通目录: {skill_dir}")
+
+        files = []
+        for path in sorted(skill_dir.rglob("*")):
+            if path.is_symlink():
+                raise ValueError(f"Skill 包禁止包含符号链接: {path.relative_to(skill_dir)}")
+            if not path.is_file():
+                continue
+            relative_path = path.relative_to(skill_dir).as_posix()
+            try:
+                content = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as exc:
+                raise ValueError(f"Skill 包只允许 UTF-8 文本文件: {relative_path}") from exc
+            files.append({"path": relative_path, "content": content})
+
+        if not files:
+            raise ValueError(f"Skill 目录没有可同步文件: {skill_dir}")
+        return self._request(
+            "POST",
+            "/external/v1/skills/sync-draft",
+            payload={"files": files},
+        )
+
 
 def render_workbench(workbench: dict) -> str:
     """把首轮握手响应渲染为只包含业务内容的中文工作台。"""
@@ -261,6 +288,27 @@ def main() -> None:
         sys.exit(1)
 
     client = StandaloneExternalAgentClient(gateway_url=gateway_url, token=token)
+
+    if sys.argv[1:] == ["--sync-skills"]:
+        skills_dir = workspace_dir / "skills"
+        try:
+            skill_dirs = sorted(
+                path
+                for path in skills_dir.iterdir()
+                if path.is_dir() and not path.is_symlink()
+            )
+            if not skill_dirs:
+                raise ValueError(f"未找到 Skill 目录: {skills_dir}")
+            for skill_dir in skill_dirs:
+                result = client.sync_skill_directory(skill_dir)
+                print(
+                    f"✅ {skill_dir.name}: {result.get('status', 'UNKNOWN')} "
+                    f"{result.get('version', '')}".rstrip()
+                )
+        except Exception as exc:
+            print(f"Skill 同步失败：{exc}")
+            sys.exit(1)
+        return
 
     if first_message:
         try:

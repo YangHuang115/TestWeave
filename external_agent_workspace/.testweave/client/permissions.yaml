@@ -1,0 +1,19 @@
+allowed:
+  - project.read
+  - requirement.read
+  - test_task.read
+  - test_task.write
+  - test_point.candidate.write
+  - test_case.candidate.write
+  - capability.read
+  - capability.run
+  - feedback.write
+  - file.upload
+
+forbidden:
+  - user.manage
+  - permission.manage
+  - project.delete
+  - capability.publish
+  - artifact.force_publish
+  - field_lock.release

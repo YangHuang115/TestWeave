@@ -1,0 +1,62 @@
+{
+  "generator_version": "0.1.0",
+  "workspace_id": "ws-local-agent",
+  "managed_files": [
+    {
+      "path": ".testweave/workspace.yaml",
+      "sha256": "00d11d112d3cb025e419287f9bee84c8d6cd61328a692383481f52b4bad0a4ca"
+    },
+    {
+      "path": ".testweave/capability/README.md",
+      "sha256": "13acd4064de71e7c0b8b78bb94d55f10ff3fd4d3c0e718288e3c5be971728202"
+    },
+    {
+      "path": ".testweave/schemas/test-point-set.schema.json",
+      "sha256": "d7ea5083440de28fa30b9228cbe188fdd73335e49424733bca5c3293e7b7254f"
+    },
+    {
+      "path": ".testweave/schemas/generated-result.schema.json",
+      "sha256": "677005b2c30c3f0b5fbf4322a1d5c1f50aad1d4107a0ea0678705afb8ea843a8"
+    },
+    {
+      "path": ".testweave/schemas/error-response.schema.json",
+      "sha256": "da01747499915cfb8915f7a2d4920b595d1236f02df3f9d3ddb7af48ee8733e7"
+    },
+    {
+      "path": ".testweave/adapters/claude-code.md",
+      "sha256": "f1e69d06b9062c45b5f23314cac67671caac1da0057bd9ee3dbb74aaab4a3f3f"
+    },
+    {
+      "path": ".testweave/adapters/generic-agent.md",
+      "sha256": "110630fbe287498a276220b597b14e82f4db3d23a0bd77410ffce008ca24177a"
+    },
+    {
+      "path": ".testweave/adapters/codex.md",
+      "sha256": "bb7efb0995f654ef3a32da4fb472aef5ea2c7404645e6ad08ea28ca2a77df0b4"
+    },
+    {
+      "path": ".testweave/adapters/mcp.json",
+      "sha256": "48a242a75d2e74b22c0ba9f4c87996e3bee2629da1f0cacbb8d151f04cc86e43"
+    },
+    {
+      "path": ".testweave/client/project.yaml",
+      "sha256": "4fbc9e7c1d76f634ff19f0194fa102fa36546d33a930411f4107092a23d16a69"
+    },
+    {
+      "path": ".testweave/client/permissions.yaml",
+      "sha256": "95feb3b3f9799e8d737e7ca9ba25f8ceb1cdca83d7acecbe7dfdac40b9ba4f0e"
+    },
+    {
+      "path": ".testweave/client/connection.yaml",
+      "sha256": "f39d127c7d5f95b024178f614ea0a747babf4752aeaeb12f510eee8a89c31b61"
+    },
+    {
+      "path": ".testweave/client/client.yaml",
+      "sha256": "6c7724b202e5491702ab355180569611e9eeaec03f5154804c15cb2e8fe6fd0c"
+    },
+    {
+      "path": ".testweave/client/instructions.md",
+      "sha256": "0959aa13197be9967887d0a7556a9c473fbb432b798c94ad837a47719c1519ef"
+    }
+  ]
+}

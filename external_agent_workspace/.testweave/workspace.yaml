@@ -1,0 +1,6 @@
+workspace:
+  id: ws-local-agent
+  name: Local Agent
+  mode: STANDALONE
+  generator_version: 0.1.0
+  project_id: prj_e2e_demo

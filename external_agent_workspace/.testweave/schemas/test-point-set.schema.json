@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://testweave.local/schemas/test-point-set.schema.json",
+  "title": "Test Point Set",
+  "type": "object",
+  "required": [
+    "items"
+  ],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "external_item_key",
+          "title",
+          "category",
+          "requirement_refs",
+          "checks"
+        ],
+        "properties": {
+          "external_item_key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "normal",
+              "abnormal",
+              "boundary",
+              "state",
+              "permission",
+              "cross_module",
+              "other"
+            ]
+          },
+          "priority": {
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          },
+          "requirement_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

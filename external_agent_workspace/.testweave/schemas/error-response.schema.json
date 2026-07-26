@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "External Client Error",
+  "type": "object",
+  "required": [
+    "error_code",
+    "message",
+    "request_id",
+    "retryable"
+  ],
+  "properties": {
+    "error_code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "details": {}
+  },
+  "additionalProperties": false
+}

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://testweave.local/schemas/skills/template/output.schema.json",
   "title": "TestWeave Skill Template Output",
   "description": "复制模板后替换标题、ID、数据字段、证据和错误约束。",

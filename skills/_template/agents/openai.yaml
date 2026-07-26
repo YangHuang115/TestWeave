@@ -1,0 +1,4 @@
+interface:
+  display_name: "TODO Skill 名称"
+  short_description: "TODO：用一句完整短句说明 Skill 的用途和触发场景"
+  default_prompt: "Use $replace-with-skill-name to complete this task."

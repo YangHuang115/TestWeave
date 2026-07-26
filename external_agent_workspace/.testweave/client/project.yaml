@@ -1,0 +1,9 @@
+project:
+  id: prj_e2e_demo
+  name: TestWeave Demo Project
+
+local_resources:
+  repository_root: .
+  test_directory: tests
+  api_spec: docs/openapi.yaml
+  project_docs: docs/

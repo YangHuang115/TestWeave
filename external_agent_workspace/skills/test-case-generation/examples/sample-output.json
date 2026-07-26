@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0",
+  "cases": [
+    {
+      "stableKey": "case-lock-on-fifth-failure",
+      "title": "连续第五次错误密码后账号被锁定",
+      "module": "module-auth",
+      "scope": "账号登录锁定",
+      "priority": "HIGH",
+      "primaryTestPointRef": "point-lock-on-fifth-failure",
+      "ruleRefs": [
+        "rule-lock-after-five"
+      ],
+      "preconditions": [
+        "测试账号未锁定",
+        "错误密码计数为 0"
+      ],
+      "testData": [
+        {
+          "name": "测试账号",
+          "value": "lockout_user_01",
+          "purpose": "验证同一账号的连续失败计数"
+        },
+        {
+          "name": "错误密码",
+          "value": "WrongPass!1",
+          "purpose": "触发认证失败"
+        }
+      ],
+      "steps": [
+        {
+          "stepNo": 1,
+          "action": "使用错误密码连续登录 4 次",
+          "expected": "4 次请求均失败且账号仍可继续尝试登录"
+        },
+        {
+          "stepNo": 2,
+          "action": "第 5 次使用错误密码登录",
+          "expected": "登录失败且账号进入锁定状态"
+        }
+      ],
+      "coreExpected": "第五次连续失败后账号锁定 30 分钟",
+      "observationPoints": [
+        "第五次响应的锁定提示",
+        "账号锁定状态及到期时间"
+      ],
+      "cleanupActions": [
+        "解除测试账号锁定并清零错误计数"
+      ],
+      "testMethod": "边界值分析",
+      "assumptionRefs": [],
+      "qualityPrecheck": {
+        "status": "PASS",
+        "findings": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "task": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskNo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "taskNo",
+        "title"
+      ],
+      "additionalProperties": true
+    },
+    "requirement": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requirementNo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "requirementNo",
+        "title"
+      ],
+      "additionalProperties": true
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "reviewMode": {
+      "type": "string",
+      "enum": [
+        "TRACEABLE",
+        "INTRINSIC"
+      ]
+    }
+  },
+  "required": [
+    "task",
+    "requirement",
+    "attachments",
+    "reviewMode"
+  ],
+  "additionalProperties": false
+}

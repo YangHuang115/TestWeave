@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0",
+  "points": [
+    {
+      "stableKey": "point-lock-on-fifth-failure",
+      "title": "第五次连续错误密码触发账号锁定",
+      "description": "验证锁定阈值和锁定状态",
+      "module": "module-auth",
+      "scope": "账号登录锁定",
+      "preconditions": [
+        "账号未锁定",
+        "错误计数为 0"
+      ],
+      "coreAction": "同一账号连续提交 5 次错误密码",
+      "coreExpected": "第五次失败后账号进入 30 分钟锁定状态",
+      "variables": [
+        {
+          "name": "错误次数",
+          "partitions": [
+            "4 次",
+            "5 次",
+            "6 次"
+          ]
+        }
+      ],
+      "testMethod": "边界值分析",
+      "testMethodReason": "锁定规则存在明确阈值 5",
+      "risk": "HIGH",
+      "priority": "HIGH",
+      "ruleRefs": [
+        "rule-lock-after-five"
+      ],
+      "questionRefs": [],
+      "moduleRelationRefs": [],
+      "allowCaseGeneration": true
+    }
+  ]
+}

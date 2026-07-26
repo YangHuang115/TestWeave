@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "acceptedTestPoints": {
+      "$ref": "#/definitions/humanGateDecision"
+    },
+    "originalContext": {
+      "$ref": "#/definitions/originalContext"
+    },
+    "acceptedUpstreamContext": {
+      "type": "object",
+      "properties": {
+        "requirement_analysis": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "minItems": 1
+        },
+        "test_points": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "requirement_analysis",
+        "test_points"
+      ],
+      "additionalProperties": false
+    },
+    "acceptedUpstreamManifest": {
+      "type": "object",
+      "properties": {
+        "requirement_analysis": {
+          "$ref": "#/definitions/upstreamSet"
+        },
+        "test_points": {
+          "$ref": "#/definitions/upstreamSet"
+        }
+      },
+      "required": [
+        "requirement_analysis",
+        "test_points"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "acceptedTestPoints",
+    "originalContext",
+    "acceptedUpstreamContext",
+    "acceptedUpstreamManifest"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "humanGateDecision": {
+      "type": "object",
+      "properties": {
+        "acceptedSetRevisionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acceptedSetHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acceptedItems": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "minItems": 1
+        },
+        "decisionSnapshot": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "acceptedSetRevisionId",
+        "acceptedSetHash",
+        "acceptedItems",
+        "decisionSnapshot"
+      ],
+      "additionalProperties": false
+    },
+    "originalContext": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "object"
+        },
+        "requirement": {
+          "type": "object"
+        },
+        "attachments": {
+          "type": "array"
+        },
+        "reviewMode": {
+          "type": "string",
+          "enum": [
+            "TRACEABLE",
+            "INTRINSIC"
+          ]
+        }
+      },
+      "required": [
+        "task",
+        "requirement",
+        "attachments",
+        "reviewMode"
+      ],
+      "additionalProperties": false
+    },
+    "upstreamSet": {
+      "type": "object",
+      "properties": {
+        "set_revision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "set_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "item_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "set_revision_id",
+        "set_hash",
+        "item_count"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

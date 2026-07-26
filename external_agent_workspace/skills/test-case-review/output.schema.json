@@ -1,0 +1,245 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "stableKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "TRACEABLE",
+        "INTRINSIC"
+      ]
+    },
+    "gateRecommendation": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "PASS_WITH_WARNINGS",
+        "BLOCK"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "caseResults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "caseRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "WARNING",
+              "FAIL"
+            ]
+          },
+          "findingRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "caseRef",
+          "status",
+          "findingRefs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "stableKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "WARNING",
+              "ERROR",
+              "CRITICAL"
+            ]
+          },
+          "caseRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fieldPath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suggestion": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "ACCEPTED",
+              "REJECTED",
+              "EDITED"
+            ]
+          },
+          "decisionReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "stableKey",
+          "severity",
+          "caseRef",
+          "fieldPath",
+          "evidenceRefs",
+          "description",
+          "suggestion",
+          "decision",
+          "decisionReason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "ruleCoverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "testPointCoverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "uncoveredRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "ruleCoverage",
+        "testPointCoverage",
+        "uncoveredRefs"
+      ],
+      "additionalProperties": false
+    },
+    "duplicateClusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "caseRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseRefs",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "unresolvedAssumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "revisionRequests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "caseRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fieldPath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "CONFIRMED",
+              "APPLIED",
+              "REJECTED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "caseRef",
+          "fieldPath",
+          "instruction",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "stableKey",
+    "mode",
+    "gateRecommendation",
+    "summary",
+    "caseResults",
+    "findings",
+    "coverage",
+    "duplicateClusters",
+    "unresolvedAssumptions",
+    "revisionRequests"
+  ],
+  "additionalProperties": false
+}

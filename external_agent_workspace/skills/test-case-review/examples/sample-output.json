@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "stableKey": "review-login-lockout-v1",
+  "mode": "TRACEABLE",
+  "gateRecommendation": "PASS",
+  "summary": "候选用例可执行并覆盖当前测试点。",
+  "caseResults": [
+    {
+      "caseRef": "case-lock-on-fifth-failure",
+      "status": "PASS",
+      "findingRefs": []
+    }
+  ],
+  "findings": [],
+  "coverage": {
+    "ruleCoverage": 1.0,
+    "testPointCoverage": 1.0,
+    "uncoveredRefs": []
+  },
+  "duplicateClusters": [],
+  "unresolvedAssumptions": [],
+  "revisionRequests": []
+}
