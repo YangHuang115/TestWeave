@@ -19,6 +19,9 @@ from testweave.core.readiness import (
 from testweave.core.request_context import RequestContextMiddleware
 from testweave.db.migrations import MIGRATIONS_PATH
 from testweave.db.session import create_database_engine
+from testweave.infrastructure.android_mcp.client import ReadOnlyAndroidMcpClient
+from testweave.modules.android_device_monitor.service import AndroidDeviceMonitorService
+from testweave.modules.android_device_monitor.stream import AndroidDeviceStreamManager
 
 
 def create_app(
@@ -39,11 +42,36 @@ def create_app(
                 MIGRATIONS_PATH,
             )
 
+    android_mcp_client = ReadOnlyAndroidMcpClient(runtime_settings.android_mcp)
+    if runtime_settings.android_mcp.enabled and runtime_settings.secret_key is None:
+        raise ValueError("启用 Android MCP 时必须配置 TESTWEAVE_SECRET_KEY")
+    android_secret = (
+        runtime_settings.secret_key.get_secret_value() if runtime_settings.secret_key else ""
+    )
+    android_device_monitor = AndroidDeviceMonitorService(
+        android_mcp_client,
+        secret=android_secret,
+        max_info_concurrency=runtime_settings.android_mcp.max_info_concurrency,
+    )
+    android_stream_settings = runtime_settings.android_mcp
+    android_device_stream_manager = AndroidDeviceStreamManager(
+        android_device_monitor,
+        enabled=android_stream_settings.enabled and android_stream_settings.stream_enabled,
+        interval_seconds=android_stream_settings.stream_interval_ms / 1000,
+        idle_grace_seconds=android_stream_settings.stream_idle_grace_seconds,
+        device_recheck_seconds=android_stream_settings.stream_device_recheck_seconds,
+        max_backoff_seconds=android_stream_settings.stream_max_backoff_seconds,
+    )
+
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        yield
-        if database_engine is not None:
-            database_engine.dispose()
+        try:
+            yield
+        finally:
+            await android_device_stream_manager.shutdown()
+            await android_mcp_client.close()
+            if database_engine is not None:
+                database_engine.dispose()
 
     app = FastAPI(
         title=runtime_settings.app_name,
@@ -55,6 +83,10 @@ def create_app(
     )
     app.state.readiness_probe = readiness_probe
     app.state.database_engine = database_engine
+    app.state.android_mcp_client = android_mcp_client
+    app.state.android_device_monitor = android_device_monitor
+    app.state.android_device_stream_manager = android_device_stream_manager
+    app.state.allowed_websocket_origins = frozenset(runtime_settings.cors_origins)
 
     app.add_middleware(UnhandledExceptionMiddleware)
     app.add_middleware(
@@ -63,7 +95,7 @@ def create_app(
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Accept", "Content-Type", "X-Request-ID", "X-CSRF-Token"],
-        expose_headers=["X-Request-ID"],
+        expose_headers=["X-Request-ID", "X-Captured-At"],
     )
     app.add_middleware(RequestContextMiddleware)
     register_exception_handlers(app)

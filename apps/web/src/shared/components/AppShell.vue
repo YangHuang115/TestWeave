@@ -115,7 +115,7 @@ const menuItems = [
   { path: "/cases", label: "用例库", icon: "🗂️" },
   { path: "/defects", label: "缺陷", icon: "🐛" },
   { path: "/reports", label: "报告", icon: "📈" },
-  { path: "/agent", label: "AI 能力中心", icon: "🤖", requirePermission: "agent.use" },
+  { path: "/agent", label: "AI 能力中心", icon: "🤖", requirePermission: "project.read" },
   { path: "/repository-settings", label: "仓库配置", icon: "📦", requireAdmin: true },
   { path: "/admin", label: "管理员设置", icon: "⚙️", requireAdmin: true },
 ];
@@ -135,6 +135,8 @@ const visibleMenuItems = computed(() => {
 
 const currentPageTitle = computed(() => {
   const currentPath = route.path;
+  if (currentPath.includes("/agent/devices")) return "设备监看";
+  if (currentPath.includes("/agent/runs/")) return "运行详情";
   const match = menuItems.find((item) => currentPath.endsWith(item.path));
   return match ? match.label : "概览";
 });
@@ -175,9 +177,19 @@ async function switchProject(projectId: string): Promise<void> {
   if (projectId === projectStore.currentProjectId) return;
 
   // 进行项目切换，路由会触发项目上下文重新加载
-  const currentSubPath =
-    menuItems.find((item) => route.path.endsWith(item.path))?.path ?? "/workbench";
+  const currentSubPath = currentProjectSubPath();
   await router.push(`/projects/${projectId}${currentSubPath}`);
+}
+
+function currentProjectSubPath(): string {
+  const projectPrefix = `/projects/${projectStore.currentProjectId}`;
+  const relativePath = route.path.startsWith(projectPrefix)
+    ? route.path.slice(projectPrefix.length)
+    : "/workbench";
+  if (relativePath.startsWith("/agent/devices")) return "/agent/devices";
+  if (relativePath.startsWith("/agent/runs/")) return relativePath;
+  if (relativePath.startsWith("/test-tasks")) return "/test-tasks";
+  return menuItems.find((item) => relativePath.startsWith(item.path))?.path ?? "/workbench";
 }
 
 async function handleLogout(): Promise<void> {
@@ -196,11 +208,18 @@ function isMenuItemActive(menuPath: string): boolean {
       currentPath.startsWith(`${projectPrefix}/tasks`)
     );
   }
+  if (menuPath === "/agent") {
+    return currentPath.startsWith(`${projectPrefix}/agent`);
+  }
   return currentPath.startsWith(`${projectPrefix}${menuPath}`);
 }
 
 async function navigateMenu(menuPath: string): Promise<void> {
   const projectId = projectStore.currentProjectId;
+  if (menuPath === "/agent" && !projectStore.hasPermission("agent.use")) {
+    await router.push(`/projects/${projectId}/agent/devices`);
+    return;
+  }
   if (menuPath === "/versions") {
     const userId = authStore.currentUser?.id;
     const lastVersionId = localStorage.getItem(`last_version:${userId}:${projectId}`);

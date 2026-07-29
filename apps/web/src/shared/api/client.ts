@@ -71,6 +71,24 @@ async function readJson(response: Response, signal: AbortSignal): Promise<unknow
   }
 }
 
+async function readBlob(response: Response, signal: AbortSignal): Promise<unknown> {
+  try {
+    return await response.blob();
+  } catch (error) {
+    if (signal.aborted) {
+      throw error;
+    }
+    return null;
+  }
+}
+
+type SuccessBodyReader = (response: Response, signal: AbortSignal) => Promise<unknown>;
+
+export interface BinaryResponse {
+  blob: Blob;
+  headers: Headers;
+}
+
 function getCsrfTokenFromCookie(): string | null {
   if (typeof document === "undefined") {
     return null;
@@ -98,6 +116,29 @@ export class ApiClient {
     init: Omit<RequestInit, "method"> = {},
   ): Promise<T> {
     return this.request<T>(path, decoder, { ...init, method: "GET" });
+  }
+
+  async getBlob(path: string, init: Omit<RequestInit, "method"> = {}): Promise<Blob> {
+    const response = await this.getBlobResponse(path, init);
+    return response.blob;
+  }
+
+  async getBlobResponse(
+    path: string,
+    init: Omit<RequestInit, "method"> = {},
+  ): Promise<BinaryResponse> {
+    return this.requestWithReader<BinaryResponse>(
+      path,
+      undefined,
+      { ...init, method: "GET" },
+      readBlob,
+      (value, response) => {
+        if (!(value instanceof Blob)) {
+          throw new Error("invalid binary response");
+        }
+        return { blob: value, headers: response.headers };
+      },
+    );
   }
 
   async post<T>(
@@ -168,10 +209,16 @@ export class ApiClient {
     return this.request<T>(path, decoder, { ...init, method: "DELETE" });
   }
 
-  async request<T>(
+  async request<T>(path: string, decoder?: ResponseDecoder<T>, init: RequestInit = {}): Promise<T> {
+    return this.requestWithReader(path, decoder, init, readJson);
+  }
+
+  private async requestWithReader<T>(
     path: string,
-    decoder?: ResponseDecoder<T>,
-    init: RequestInit = {},
+    decoder: ResponseDecoder<T> | undefined,
+    init: RequestInit,
+    readSuccessBody: SuccessBodyReader,
+    successDecoder?: (value: unknown, response: Response) => T,
   ): Promise<T> {
     const requestId = this.requestIdFactory();
     if (init.signal?.aborted) {
@@ -202,7 +249,9 @@ export class ApiClient {
     init.signal?.addEventListener("abort", abortFromCaller, { once: true });
 
     const headers = new Headers(init.headers);
-    headers.set("Accept", "application/json");
+    if (!headers.has("Accept")) {
+      headers.set("Accept", "application/json");
+    }
     headers.set("X-Request-ID", requestId);
 
     // 对写请求自动设置 CSRF 头
@@ -220,7 +269,9 @@ export class ApiClient {
         headers,
         signal: controller.signal,
       });
-      const body = await readJson(response, controller.signal);
+      const body = response.ok
+        ? await readSuccessBody(response, controller.signal)
+        : await readJson(response, controller.signal);
       if (!response.ok) {
         if (isStandardErrorBody(body)) {
           throw new ApiError({ ...body, status: response.status });
@@ -235,7 +286,11 @@ export class ApiClient {
         });
       }
       try {
-        return decoder ? decoder(body) : (body as T);
+        return successDecoder
+          ? successDecoder(body, response)
+          : decoder
+            ? decoder(body)
+            : (body as T);
       } catch {
         throw new ApiError({
           code: "INVALID_RESPONSE",

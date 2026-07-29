@@ -4,6 +4,8 @@ from typing import Literal, Self
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from testweave.modules.android_device_monitor.config import AndroidMcpSettings
+
 MINIMUM_PRODUCTION_SECRET_LENGTH = 32
 MINIMUM_PRODUCTION_SECRET_UNIQUE_CHARACTERS = 8
 KNOWN_INSECURE_SECRET_KEYS = frozenset(
@@ -21,6 +23,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         env_prefix="TESTWEAVE_",
+        env_nested_delimiter="__",
         extra="ignore",
         hide_input_in_errors=True,
     )
@@ -42,6 +45,7 @@ class Settings(BaseSettings):
     storage_local_dir: str = Field(default="data/storage")
     git_known_hosts_file: str | None = None
     secret_key: SecretStr | None = None
+    android_mcp: AndroidMcpSettings = Field(default_factory=AndroidMcpSettings)
 
     @field_validator("database_url")
     @classmethod
@@ -62,10 +66,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def require_strong_production_secret_key(self) -> Self:
-        if self.environment != "production":
+        if self.environment != "production" and not self.android_mcp.enabled:
             return self
 
         if self.secret_key is None:
+            if self.android_mcp.enabled:
+                raise ValueError("启用 Android MCP 时必须配置 TESTWEAVE_SECRET_KEY")
             raise ValueError("生产环境必须配置 TESTWEAVE_SECRET_KEY")
 
         secret_key = self.secret_key.get_secret_value()
@@ -74,6 +80,8 @@ class Settings(BaseSettings):
             or len(set(secret_key)) < MINIMUM_PRODUCTION_SECRET_UNIQUE_CHARACTERS
             or secret_key in KNOWN_INSECURE_SECRET_KEYS
         ):
+            if self.android_mcp.enabled:
+                raise ValueError("启用 Android MCP 时的 TESTWEAVE_SECRET_KEY 必须使用至少 32 字符的高熵随机值")
             raise ValueError("生产环境的 TESTWEAVE_SECRET_KEY 必须使用至少 32 字符的高熵随机值")
         return self
 

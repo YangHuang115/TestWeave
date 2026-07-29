@@ -78,7 +78,7 @@
           <button
             v-if="task.status === 'ARCHIVED'"
             class="btn btn-emerald"
-            @click="restoreArchived"
+            @click="openTransitionModal('previous_status')"
           >
             激活恢复任务
           </button>
@@ -775,6 +775,7 @@ const getTransitionModalTitle = () => {
   if (pendingTargetStatus.value === "CANCELLED") return "取消此任务运行 (CANCELLED)";
   if (pendingTargetStatus.value === "UNBLOCK") return "解除任务阻塞状态";
   if (pendingTargetStatus.value === "RESTORE_CANCEL") return "恢复已取消任务为草稿";
+  if (pendingTargetStatus.value === "previous_status") return "激活恢复已归档的任务";
   return "变更任务运行状态";
 };
 
@@ -811,7 +812,7 @@ const executeTransition = async () => {
     let target = pendingTargetStatus.value;
     let actualStatus = target;
 
-    if (target === "UNBLOCK") {
+    if (target === "UNBLOCK" || target === "REOPEN") {
       actualStatus = "IN_PROGRESS";
     } else if (target === "RESTORE_CANCEL") {
       actualStatus = "DRAFT";
@@ -842,21 +843,15 @@ const executeTransition = async () => {
 const archiveTask = async () => {
   if (!confirm("归档后任务将无法在看板列表中直接展示。确定归档该任务吗？")) return;
   try {
-    await testTasksApi.archive(projectId.value, taskId.value);
+    const updated = await testTasksApi.transition(projectId.value, taskId.value, {
+      targetStatus: "ARCHIVED",
+      rowVersion: task.value.rowVersion,
+    });
+    task.value = updated;
     alert("任务归档成功");
     fetchDetailData();
   } catch (err: any) {
     alert("归档失败: " + (err.response?.data?.message || err.message));
-  }
-};
-
-const restoreArchived = async () => {
-  try {
-    await testTasksApi.restore(projectId.value, taskId.value);
-    alert("任务已成功恢复为进行中状态！");
-    fetchDetailData();
-  } catch (err: any) {
-    alert("激活恢复失败: " + (err.response?.data?.message || err.message));
   }
 };
 

@@ -1,8 +1,9 @@
 import uuid
 
-from fastapi import Depends, Request
+from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.requests import HTTPConnection
 
 from testweave.api.dependencies.auth import get_current_user
 from testweave.api.dependencies.database import get_db
@@ -18,7 +19,7 @@ class ProjectPermissionChecker:
 
     async def __call__(
         self,
-        request: Request,
+        request: HTTPConnection,
         projectId: uuid.UUID,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user),
@@ -41,7 +42,7 @@ class ProjectPermissionChecker:
         # 并且校验的不是项目本身的更新权限，则拒绝写入。
         if (
             project.status == "archived"
-            and request.method in ["POST", "PUT", "PATCH", "DELETE"]
+            and request.scope.get("method") in ["POST", "PUT", "PATCH", "DELETE"]
             and self.permission_code != PROJECT_UPDATE
         ):
             raise AppError(

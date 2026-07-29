@@ -20,6 +20,7 @@ dependencies = [
   "python-multipart>=0.0.18,<1",
   "cryptography>=44.0,<45",
   "jsonschema>=4.20,<5",
+  "mcp>=1.28.1,<2",
 ]
 
 [dependency-groups]

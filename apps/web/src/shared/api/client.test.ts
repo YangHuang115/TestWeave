@@ -235,4 +235,48 @@ describe("ApiClient", () => {
 
     document.cookie = "xsrf_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
   });
+
+  it("reads binary responses while preserving the image accept header", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(new Blob(["png"]), {
+        status: 200,
+        headers: { "Content-Type": "image/png" },
+      }),
+    );
+    const client = new ApiClient({ fetcher, requestIdFactory: () => "req_blob_1" });
+
+    const blob = await client.getBlob("/android-devices/device/screen", {
+      headers: { Accept: "image/png" },
+    });
+
+    expect(blob.type).toBe("image/png");
+    const [, init] = fetcher.mock.calls[0]!;
+    expect(new Headers(init?.headers).get("Accept")).toBe("image/png");
+    expect(new Headers(init?.headers).get("X-Request-ID")).toBe("req_blob_1");
+  });
+
+  it("parses the standard JSON error envelope for binary requests", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: "ANDROID_DEVICE_UNAVAILABLE",
+          message: "设备当前不可用",
+          requestId: "req_blob_error",
+          retryable: true,
+          details: null,
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+    const client = new ApiClient({ fetcher, requestIdFactory: () => "req_blob_error_ui" });
+
+    await expect(client.getBlob("/android-devices/device/screen")).rejects.toMatchObject({
+      code: "ANDROID_DEVICE_UNAVAILABLE",
+      requestId: "req_blob_error",
+      status: 409,
+    });
+  });
 });

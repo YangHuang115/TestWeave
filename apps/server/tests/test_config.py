@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from testweave.core.config import Settings
+from testweave.modules.android_device_monitor.config import AndroidMcpSettings
 
 LEGACY_DEFAULT_SECRET = "testweave-default-super-secret-key-32bytes!"
 LOCAL_EXAMPLE_SECRET = "local-development-only-secret-key-change-me"
@@ -73,3 +74,42 @@ def test_production_accepts_strong_secret_key() -> None:
 
     assert settings.secret_key is not None
     assert settings.secret_key.get_secret_value() == STRONG_PRODUCTION_SECRET
+
+
+def test_enabled_android_mcp_requires_secret_key_in_development() -> None:
+    with pytest.raises(ValidationError, match="启用 Android MCP"):
+        Settings(
+            environment="development",
+            android_mcp=AndroidMcpSettings(enabled=True),
+            _env_file=None,
+        )
+
+
+def test_enabled_android_mcp_accepts_strong_secret_key_in_development() -> None:
+    settings = Settings(
+        environment="development",
+        android_mcp=AndroidMcpSettings(enabled=True),
+        secret_key=STRONG_PRODUCTION_SECRET,
+        _env_file=None,
+    )
+
+    assert settings.android_mcp.enabled is True
+
+
+def test_android_stream_settings_use_safe_disabled_defaults() -> None:
+    settings = AndroidMcpSettings()
+
+    assert settings.stream_enabled is False
+    assert settings.stream_interval_ms == 500
+    assert settings.stream_idle_grace_seconds == 3
+    assert settings.stream_device_recheck_seconds == 5
+    assert settings.stream_max_backoff_seconds == 5
+
+
+def test_android_stream_settings_reject_unbounded_or_too_fast_values() -> None:
+    with pytest.raises(ValidationError):
+        AndroidMcpSettings(stream_interval_ms=0)
+    with pytest.raises(ValidationError):
+        AndroidMcpSettings(stream_idle_grace_seconds=120)
+    with pytest.raises(ValidationError):
+        AndroidMcpSettings(stream_max_backoff_seconds=120)

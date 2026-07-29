@@ -18,6 +18,7 @@ import MindmapPage from "../modules/cases/MindmapPage.vue";
 import DefectsPage from "../modules/defects/DefectsPage.vue";
 import ReportsPage from "../modules/reports/ReportsPage.vue";
 import AgentCenterPage from "../modules/agent/AgentCenterPage.vue";
+import AndroidDeviceMonitorPage from "../modules/agent/AndroidDeviceMonitorPage.vue";
 import RunDetailsPage from "../modules/agent/RunDetailsPage.vue";
 import AdminSettingsPage from "../modules/admin/AdminSettingsPage.vue";
 import RepositorySettingsPage from "../modules/repository-settings/RepositorySettingsPage.vue";
@@ -79,8 +80,18 @@ export const router = createRouter({
         { path: "cases", component: CasesPage },
         { path: "defects", component: DefectsPage },
         { path: "reports", component: ReportsPage },
-        { path: "agent", component: AgentCenterPage },
-        { path: "agent/runs/:runId", component: RunDetailsPage },
+        {
+          path: "agent/devices",
+          component: AndroidDeviceMonitorPage,
+          props: true,
+          meta: { permission: "project.read" },
+        },
+        { path: "agent", component: AgentCenterPage, meta: { permission: "agent.use" } },
+        {
+          path: "agent/runs/:runId",
+          component: RunDetailsPage,
+          meta: { permission: "agent.use" },
+        },
         { path: "repository-settings", component: RepositorySettingsPage },
         { path: "admin", component: AdminSettingsPage },
       ],
@@ -147,11 +158,13 @@ router.beforeEach(async (to, from, next) => {
       }
     }
 
-    // 5. 校验权限
-    if (to.path.includes("/agent")) {
-      const hasAgentPermission = projectStore.hasPermission("agent.use");
+    // 5. 校验路由声明的项目权限。设备监看只需 project.read，不能把
+    // Agent 中心的治理/运行页面一并开放给普通项目成员。
+    const requiredPermission = to.meta.permission;
+    if (typeof requiredPermission === "string") {
+      const hasPermission = projectStore.hasPermission(requiredPermission);
       const isSystemAdmin = authStore.currentUser?.is_system_admin;
-      if (!hasAgentPermission && !isSystemAdmin) {
+      if (!hasPermission && !isSystemAdmin) {
         next("/403");
         return;
       }

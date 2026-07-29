@@ -1,5 +1,6 @@
-from fastapi import Depends, Request
+from fastapi import Depends
 from sqlalchemy.orm import Session
+from starlette.requests import HTTPConnection
 
 from testweave.api.dependencies.database import get_db
 from testweave.core.errors import AppError
@@ -8,7 +9,7 @@ from testweave.modules.auth.service import AuthService
 
 
 async def get_current_user(
-    request: Request,
+    request: HTTPConnection,
     db: Session = Depends(get_db),
 ) -> User:
     """提取会话 Cookie 校验当前登录用户，并进行 CSRF 防御校验"""
@@ -21,7 +22,7 @@ async def get_current_user(
         )
 
     # 写请求 (POST, PUT, PATCH, DELETE) 执行 CSRF 校验 (Double Submit Cookie)
-    if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+    if request.scope.get("method") in ["POST", "PUT", "PATCH", "DELETE"]:
         xsrf_cookie = request.cookies.get("xsrf_token")
         xsrf_header = request.headers.get("X-CSRF-Token")
         if not xsrf_cookie or not xsrf_header or xsrf_cookie != xsrf_header:

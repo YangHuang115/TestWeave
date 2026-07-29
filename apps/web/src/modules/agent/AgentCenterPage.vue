@@ -2,11 +2,26 @@
   <div class="agent-center-container">
     <!-- 顶部标题区 -->
     <div class="header-section">
-      <div class="title-wrapper">
-        <h2 class="title">AI 能力中心</h2>
-        <span class="badge">只读控制台</span>
+      <div class="header-copy">
+        <div class="title-wrapper">
+          <h2 class="title">AI 能力中心</h2>
+          <span class="badge">只读控制台</span>
+        </div>
+        <p class="subtitle">管理平台可同步、只读查看的 AI 测试能力、拓扑流水线以及外部智能体。</p>
       </div>
-      <p class="subtitle">管理平台可同步、只读查看的 AI 测试能力、拓扑流水线以及外部智能体。</p>
+      <button
+        class="device-monitor-entry"
+        type="button"
+        aria-label="进入设备监看"
+        @click="openDeviceMonitor"
+      >
+        <span class="device-entry-icon" aria-hidden="true">▣</span>
+        <span class="device-entry-copy">
+          <strong>设备监看</strong>
+          <small>实时查看 Agent 操作结果</small>
+        </span>
+        <span class="device-entry-arrow" aria-hidden="true">›</span>
+      </button>
     </div>
 
     <!-- 上半部分：令牌管理 + 智能体活动状态 (两栏布局) -->
@@ -636,6 +651,11 @@ const route = useRoute();
 const router = useRouter();
 const projectId = computed(() => route.params.projectId as string);
 
+async function openDeviceMonitor(): Promise<void> {
+  if (!projectId.value) return;
+  await router.push(`/projects/${projectId.value}/agent/devices`);
+}
+
 async function triggerPreviewRun(cap: AICapability): Promise<void> {
   if (!projectId.value) return;
   const targetVerId = cap.current_published_version_id || selectedVersionDetail.value?.id;
@@ -1112,8 +1132,16 @@ function truncateText(text: string, len: number): string {
 
 .header-section {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header-copy {
+  display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .title-wrapper {
@@ -1151,6 +1179,67 @@ function truncateText(text: string, len: number): string {
   margin: 0;
 }
 
+.device-monitor-entry {
+  align-items: center;
+  background: linear-gradient(135deg, #0e8fc2, #6557df);
+  border: 1px solid rgba(142, 205, 255, 0.34);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(44, 90, 190, 0.22);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+  min-width: 260px;
+  padding: 12px 15px;
+  text-align: left;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.device-monitor-entry:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.device-monitor-entry:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 3px;
+}
+
+.device-entry-icon {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  display: flex;
+  font-size: 18px;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.device-entry-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.device-entry-copy strong {
+  font-size: 14px;
+}
+
+.device-entry-copy small {
+  color: rgba(240, 248, 255, 0.84);
+  font-size: 11px;
+}
+
+.device-entry-arrow {
+  font-size: 24px;
+  line-height: 1;
+}
+
 /* 两栏两行式排版 */
 .top-row {
   display: grid;
@@ -1159,6 +1248,15 @@ function truncateText(text: string, len: number): string {
 }
 
 @media (max-width: 1024px) {
+  .header-section {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .device-monitor-entry {
+    align-self: flex-start;
+  }
+
   .top-row {
     grid-template-columns: 1fr;
   }
