@@ -30,7 +30,7 @@ WORKBENCH_SKILL_NODES = {
 
 
 class BuiltinAiTestDesignCapabilityService:
-    """从项目已发布 Skill 版本组装并固定工作台能力版本。"""
+    """按平台内置输入/输出标准组装工作台能力版本；已发布 Skill 按可用性绑定。"""
 
     @classmethod
     def ensure_published(
@@ -39,12 +39,16 @@ class BuiltinAiTestDesignCapabilityService:
         actor_id: uuid.UUID,
         project_id: uuid.UUID,
     ) -> AICapability:
-        skill_versions = cls._resolve_published_skill_versions(db, project_id)
+        skill_versions = cls._resolve_skill_versions(db, project_id)
         workflow = copy.deepcopy(BUILTIN_WORKFLOW)
         binding_fingerprints: dict[str, dict[str, str]] = {}
 
         for node_id, skill_code in WORKBENCH_SKILL_NODES.items():
-            skill, skill_version = skill_versions[skill_code]
+            resolved = skill_versions.get(skill_code)
+            if resolved is None:
+                # 未发布的 Skill 不阻断组装，节点沿用内置 canonical output_schema 与 model_policy。
+                continue
+            skill, skill_version = resolved
             node = workflow["nodes"][node_id]
             node["skill_version_id"] = str(skill_version.id)
             node["input_schema"] = skill_version.input_schema
@@ -140,15 +144,18 @@ class BuiltinAiTestDesignCapabilityService:
                     status_code=409,
                 )
 
-        SkillRegistryService.bind_capability_version(
-            db=db,
-            project_id=project_id,
-            capability_version_id=version.id,
-            node_skill_versions={
-                node_id: skill_versions[skill_code][1].id
-                for node_id, skill_code in WORKBENCH_SKILL_NODES.items()
-            },
-        )
+        node_skill_versions = {
+            node_id: skill_versions[skill_code][1].id
+            for node_id, skill_code in WORKBENCH_SKILL_NODES.items()
+            if skill_code in skill_versions
+        }
+        if node_skill_versions:
+            SkillRegistryService.bind_capability_version(
+                db=db,
+                project_id=project_id,
+                capability_version_id=version.id,
+                node_skill_versions=node_skill_versions,
+            )
 
         previous_version_id = capability.current_published_version_id
         if previous_version_id and previous_version_id != version.id:
@@ -161,12 +168,12 @@ class BuiltinAiTestDesignCapabilityService:
         return capability
 
     @staticmethod
-    def _resolve_published_skill_versions(
+    def _resolve_skill_versions(
         db: Session,
         project_id: uuid.UUID,
     ) -> dict[str, tuple[AISkill, AISkillVersion]]:
+        """按可用性解析已发布 Skill 版本；未发布/未同步的 Skill 不拦截，直接跳过。"""
         resolved: dict[str, tuple[AISkill, AISkillVersion]] = {}
-        missing: list[str] = []
 
         for skill_code in WORKBENCH_SKILL_NODES.values():
             skill = db.scalar(
@@ -187,15 +194,7 @@ class BuiltinAiTestDesignCapabilityService:
                 or skill_version.skill_id != skill.id
                 or skill_version.status != "PUBLISHED"
             ):
-                missing.append(skill_code)
                 continue
             resolved[skill_code] = (skill, skill_version)
 
-        if missing:
-            raise AppError(
-                code="AI_TEST_DESIGN_SKILLS_NOT_READY",
-                message="AI 测试设计工作台所需 Skill 尚未全部注册并发布",
-                status_code=409,
-                details={"missingSkillCodes": sorted(missing)},
-            )
         return resolved

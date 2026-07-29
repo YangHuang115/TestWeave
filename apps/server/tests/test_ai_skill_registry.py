@@ -571,26 +571,52 @@ def test_declared_skill_version_requires_matching_binding(
     assert exc_info.value.code == "RUN_SKILL_BINDING_INVALID"
 
 
-def test_workbench_capability_requires_and_pins_four_published_project_skills(
+def test_workbench_capability_assembles_from_canonical_without_published_skills(
     db: Session,
     skill_context: dict[str, Any],
 ) -> None:
     admin = skill_context["admin"]
     project = skill_context["project"]
 
-    with pytest.raises(AppError) as missing_exc:
-        BuiltinAiTestDesignCapabilityService.ensure_published(
-            db,
-            actor_id=admin.id,
-            project_id=project.id,
-        )
-    assert missing_exc.value.code == "AI_TEST_DESIGN_SKILLS_NOT_READY"
-    assert sorted(missing_exc.value.details["missingSkillCodes"]) == [
-        "requirement-analysis",
-        "test-case-generation",
-        "test-case-review",
-        "test-point-generation",
-    ]
+    capability = BuiltinAiTestDesignCapabilityService.ensure_published(
+        db,
+        actor_id=admin.id,
+        project_id=project.id,
+    )
+    version = db.get(AICapabilityVersion, capability.current_published_version_id)
+    bindings = list(
+        db.scalars(
+            select(AICapabilitySkillBinding).where(
+                AICapabilitySkillBinding.capability_version_id == version.id
+            )
+        ).all()
+    )
+
+    assert capability.scope == "PROJECT"
+    assert capability.project_id == project.id
+    assert version.status == "PUBLISHED"
+    assert bindings == []
+    for node_id in ["requirement_analysis", "test_points", "test_cases", "case_review"]:
+        node = version.workflow_snapshot["nodes"][node_id]
+        assert "skill_version_id" not in node
+        assert node["output_schema"]["type"] == "object"
+        assert node["model_policy"] == "quality_first"
+
+    # 未发布 Skill 时指纹稳定，重复组装复用同一 canonical 版本
+    again = BuiltinAiTestDesignCapabilityService.ensure_published(
+        db,
+        actor_id=admin.id,
+        project_id=project.id,
+    )
+    assert again.current_published_version_id == version.id
+
+
+def test_workbench_capability_pins_four_published_project_skills(
+    db: Session,
+    skill_context: dict[str, Any],
+) -> None:
+    admin = skill_context["admin"]
+    project = skill_context["project"]
 
     synced_by_code = {}
     for code in [

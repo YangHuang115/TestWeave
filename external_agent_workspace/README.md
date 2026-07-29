@@ -108,7 +108,7 @@ python external_agent_workspace/run_agent.py --mode share --sync-skills requirem
 python external_agent_workspace/run_agent.py --sync-skills
 ```
 
-同步只创建 `SYNCED_DRAFT` 版本，外接 Agent 不能发布。发布前必须通过 Manifest 校验、输入输出 Schema 校验、路径/文件类型/符号链接等安全校验，并由具备项目 `agent.manage` 权限的用户明确确认后在平台执行；固定模型评测可以执行并展示结果，v1 不作为发布硬阻断。四个 Skill 都发布后，平台 AI 测试设计工作台新建记录才会绑定它们（缺少时返回 `AI_TEST_DESIGN_SKILLS_NOT_READY`，该错误不影响 local 和 connected 外接模式）。
+同步只创建 `SYNCED_DRAFT` 版本，外接 Agent 不能发布。发布前必须通过 Manifest 校验、输入输出 Schema 校验、路径/文件类型/符号链接等安全校验，并由具备项目 `agent.manage` 权限的用户明确确认后在平台执行；固定模型评测可以执行并展示结果，v1 不作为发布硬阻断。发布不是使用前提：平台 AI 测试设计工作台新建记录与 connected 模式提交 Candidate 均不要求 Skill 已发布，能力版本按平台内置输入/输出标准 Schema 组装，已发布的 Skill 按可用性绑定到能力版本以保留可追溯性。
 
 ## 四个可编辑 Skill
 

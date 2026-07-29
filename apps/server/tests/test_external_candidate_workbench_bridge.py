@@ -29,6 +29,10 @@ def workbench_bridge_context(db: Session, monkeypatch: pytest.MonkeyPatch) -> di
     from testweave.modules.ai_capability.config import get_external_agent_config
 
     get_external_agent_config.cache_clear()
+    return _build_bridge_context(db)
+
+
+def _build_bridge_context(db: Session, *, publish_skills: bool = True) -> dict[str, Any]:
     admin = User(
         email=f"editor_{uuid.uuid4().hex[:6]}@testweave.com",
         username=f"editor_{uuid.uuid4().hex[:6]}",
@@ -109,11 +113,12 @@ def workbench_bridge_context(db: Session, monkeypatch: pytest.MonkeyPatch) -> di
     db.add(ttr)
 
     db.commit()
-    publish_workbench_skills(
-        db,
-        project_id=project.id,
-        user_id=admin.id,
-    )
+    if publish_skills:
+        publish_workbench_skills(
+            db,
+            project_id=project.id,
+            user_id=admin.id,
+        )
 
     token_obj, raw_token = ExternalAgentTokenService.create_token(
         db,
@@ -264,6 +269,84 @@ async def test_external_candidate_submission_auto_mounts_workbench_run(
 
         app.dependency_overrides.clear()
         get_external_agent_config.cache_clear()
+
+
+@pytest.mark.anyio
+async def test_external_candidate_submission_succeeds_without_published_skills(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """四个 Skill 均未发布时，提交 Candidate 不再被发布门禁拦截，仅按产物 Schema 把关。"""
+    monkeypatch.setenv("TESTWEAVE_EXTERNAL_AGENT__ENABLED", "true")
+    monkeypatch.setenv("TESTWEAVE_AI_RUNTIME__ENABLED", "true")
+    from testweave.modules.ai_capability.config import get_external_agent_config
+
+    get_external_agent_config.cache_clear()
+    context = _build_bridge_context(db, publish_skills=False)
+    task = context["task"]
+    raw_token = context["raw_token"]
+
+    app = create_app()
+    from testweave.api.dependencies.database import get_db
+
+    app.dependency_overrides[get_db] = lambda: db
+
+    headers = {
+        "Authorization": f"Bearer {raw_token}",
+        "Idempotency-Key": f"bridge-no-publish-{uuid.uuid4().hex}",
+    }
+    payload = {
+        "taskKey": task.task_no,
+        "artifactType": "requirement_analysis@1.0",
+        "payload": {
+            "schemaVersion": "1.0",
+            "stableKey": "requirement-analysis",
+            "goal": "验证游戏战斗系统功能",
+            "inScope": ["战斗伤害计算"],
+            "outOfScope": ["UI 动画展现"],
+            "modules": [{"id": "battle", "title": "战斗模块", "description": "处理伤害与冷却"}],
+            "moduleRelations": [],
+            "rules": [
+                {"id": "RULE-001", "description": "冷却时间为 5 秒", "evidenceRefs": ["SRC-001"]}
+            ],
+            "inferences": [],
+            "questions": [],
+            "risks": [],
+            "evidence": [
+                {
+                    "id": "SRC-001",
+                    "sourceType": "REQUIREMENT",
+                    "sourceRef": "REQ-001",
+                    "quote": "冷却时间固定为 5 秒",
+                }
+            ],
+        },
+    }
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        res_sub = await ac.post("/external/v1/revision/candidates", json=payload, headers=headers)
+        assert res_sub.status_code == 200, res_sub.text
+        data_sub = res_sub.json()
+        assert data_sub["status"] == "SUBMITTED"
+        assert data_sub["recordId"] is not None
+        assert data_sub["setRevisionId"] is not None
+
+    records = list(
+        db.scalars(select(AITestDesignRecord).where(AITestDesignRecord.task_id == task.id)).all()
+    )
+    assert len(records) == 1
+    sets = list(
+        db.scalars(
+            select(AIArtifactSetRevision).where(
+                AIArtifactSetRevision.run_id == records[0].run_id,
+                AIArtifactSetRevision.producer_node_id == "requirement_analysis",
+            )
+        ).all()
+    )
+    assert len(sets) == 1
+    assert sets[0].review_status == "CANDIDATE"
+
+    app.dependency_overrides.clear()
+    get_external_agent_config.cache_clear()
 
 
 @pytest.mark.anyio
