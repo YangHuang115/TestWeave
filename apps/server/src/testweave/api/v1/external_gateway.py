@@ -323,6 +323,7 @@ async def get_external_candidate_submission_endpoint(
 @router.post("/attachments/register", summary="外接 Agent Client 注册过程生成依赖附件")
 async def register_candidate_attachment(
     body: RegisterAttachmentRequest,
+    request: Request,
     authorization: str | None = Header(None, alias="Authorization"),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -348,6 +349,7 @@ async def register_candidate_attachment(
         file_size=body.fileSize,
         mime_type=body.mimeType,
         checksum=body.checksum,
+        base_url=str(request.base_url),
     )
     return result
 

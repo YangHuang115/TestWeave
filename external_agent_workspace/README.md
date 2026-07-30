@@ -66,7 +66,7 @@ python external_agent_workspace/run_agent.py --record-next <recordId>
 
 只有用户明确选择「连接 TestWeave」时才需要 Token：
 
-1. 按仓库根 `README.md` 本地启动 TestWeave（Gateway 默认监听 `http://127.0.0.1:8787`）。
+1. 按仓库根 `README.md` 本地启动 TestWeave。Gateway 路由（`/external/v1/*`）挂载在主服务 FastAPI 应用内，与主服务**同进程同端口**；外接 Agent 侧只需配置 `TESTWEAVE_GATEWAY_URL` 指向主服务地址（快速开始默认值：`http://127.0.0.1:8787`，见 `.env.example`）。
 2. 在 Web 界面「设置 / Access Token」生成外接 Agent Token，日常连接只勾选 `test_task.read`、`requirement.read`、`revision:candidate`（**不要**包含 `skill:sync`）。
 3. 写入本地配置：
 
@@ -74,8 +74,10 @@ python external_agent_workspace/run_agent.py --record-next <recordId>
    cp external_agent_workspace/.env.example external_agent_workspace/.env.local
    # 编辑 .env.local：
    # TESTWEAVE_AGENT_TOKEN=tw_ext_你的真实token
-   # TESTWEAVE_GATEWAY_URL=http://127.0.0.1:8787
+   # TESTWEAVE_GATEWAY_URL=<Gateway 地址，默认值见 .env.example>
    ```
+
+4. 如果修改了 `TESTWEAVE_GATEWAY_URL`，运行一次 `python external_agent_workspace/run_agent.py --init` 同步 `.testweave/` 下的适配器配置（`adapters/mcp.json`、`client/connection.yaml`）；内容一致时会提示“已是最新”，幂等可重跑。
 
 ```bash
 # 会话检查 / 首句解析工作台
@@ -127,12 +129,12 @@ python external_agent_workspace/run_agent.py --sync-skills
 
 ## 安全约束（重要）
 
-- Gateway 的 `8787` 端口**仅绑定回环地址**（`127.0.0.1` / `::1`），拒绝绑定公网网卡（`0.0.0.0`）。因此外接 Agent 必须与 TestWeave 服务端**运行在同一台机器**上。
+- Gateway 路由与主服务**同进程同端口**，本地开发下主服务**仅绑定回环地址**（`127.0.0.1` / `::1`），不绑定公网网卡（`0.0.0.0`）。因此外接 Agent 必须与 TestWeave 服务端**运行在同一台机器**上，并通过 `TESTWEAVE_GATEWAY_URL` 指向该回环地址。
 - Token 采用 `Authorization: Bearer tw_ext_xxxxxxxxxxxx` 鉴权；生效权限 = 授予权限 ∩ 项目角色允许权限，项目角色变更（如降级为 `VIEWER`）会即时缩减权限，无需重新颁发 Token。
 - 按最小权限拆分 Token：日常连接 Token 不包含 `skill:sync`；`skill:sync` 只放在显式分享时使用的 Token 中。
 - `.env.local`、`runs/`、`*.token`、`*.secret` 均已加入 `.gitignore`，不会被提交。
 
-## 协议速查（curl 示例）
+## 协议速查（curl 示例，均以默认 `TESTWEAVE_GATEWAY_URL` 为例）
 
 ```bash
 # 校验 Session
@@ -164,7 +166,7 @@ curl -X POST http://127.0.0.1:8787/external/v1/skills/sync-draft \
 - `scripts/skill_records.py`：本地链式记录存储实现（原子写入、Revision 不可覆盖）。
 - `runs/`：本地链式记录数据（不提交、不上传）。
 - `.agents/skills/`、`.claude/skills/`、`.agent/skills/`：指向 `skills/` 的激活链接，不是副本。
-- `.testweave/`：**未随本仓库发布**。仅当你要用自有的 Claude Code / Codex / 通用 Agent 对接 Gateway 时才需要（适配器说明、客户端配置、结构化 Schema）；本基础客户端 `run_agent.py` 不依赖它。
+- `.testweave/`：**未随本仓库发布**。仅当你要用自有的 Claude Code / Codex / 通用 Agent 对接 Gateway 时才需要（适配器说明、客户端配置、结构化 Schema）；本基础客户端 `run_agent.py` 不依赖它。修改 `TESTWEAVE_GATEWAY_URL` 后用 `python run_agent.py --init` 同步其中的 `adapters/mcp.json` 与 `client/connection.yaml`。
 - `.env.example`：配置模板（已发布）；`.env.local` 为本地密钥，**不要提交**。仅 connected / share 模式需要。
 
 ## 相关阅读（仓库内部，未随公开版发布）

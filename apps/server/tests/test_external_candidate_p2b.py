@@ -240,5 +240,11 @@ async def test_external_gateway_candidate_api_endpoints(
         )
         assert res_att.status_code == 200
         assert res_att.json()["fileName"] == "execution_trace.log"
+        # uploadUrl 必须基于本次请求的 base_url 拼接，不得硬编码 host:port
+        att_id = res_att.json()["attachmentId"]
+        assert (
+            res_att.json()["uploadUrl"]
+            == f"http://testserver/external/v1/attachments/upload/{att_id}"
+        )
 
     get_external_agent_config.cache_clear()

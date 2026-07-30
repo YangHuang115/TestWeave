@@ -9,7 +9,7 @@ POSTGRES_PORT ?= 5432
 SERVER_PORT ?= 8000
 WEB_PORT ?= 5173
 
-.PHONY: help setup doctor db-up db-down reset-db migrate server gateway ai-runtime-worker web test-server test-server-integration test-e2e check-server check-web check clean
+.PHONY: help setup doctor db-up db-down reset-db migrate server ai-runtime-worker web test-server test-server-integration test-e2e check-server check-web check clean
 
 help:
 	@echo "make setup                     安装并锁定前后端依赖"
@@ -19,7 +19,6 @@ help:
 	@echo "make reset-db                  重置本地开发数据库（销毁数据卷后重建并迁移）"
 	@echo "make migrate                   升级数据库到最新迁移"
 	@echo "make server                    启动 FastAPI 开发服务"
-	@echo "make gateway                   启动 Agent 网关"
 	@echo "make ai-runtime-worker         启动 AI Runtime 工作进程"
 	@echo "make web                       启动 Vue 开发服务"
 	@echo "make test-server               运行后端单元测试"
@@ -92,16 +91,13 @@ migrate:
 	UV_CACHE_DIR=$(UV_CACHE_DIR) UV_NATIVE_TLS=$(UV_NATIVE_TLS) uv run --project apps/server alembic -c apps/server/alembic.ini upgrade head
 
 server:
-	UV_CACHE_DIR=$(UV_CACHE_DIR) UV_NATIVE_TLS=$(UV_NATIVE_TLS) uv run --project apps/server uvicorn testweave.main:app --app-dir apps/server/src --host 127.0.0.1 --port 8000 --reload
-
-gateway:
-	UV_CACHE_DIR=$(UV_CACHE_DIR) UV_NATIVE_TLS=$(UV_NATIVE_TLS) uv run --project apps/server python3 -m testweave.cli start-gateway
+	UV_CACHE_DIR=$(UV_CACHE_DIR) UV_NATIVE_TLS=$(UV_NATIVE_TLS) uv run --project apps/server uvicorn testweave.main:app --app-dir apps/server/src --host 127.0.0.1 --port $(SERVER_PORT) --reload
 
 ai-runtime-worker:
 	UV_CACHE_DIR=$(UV_CACHE_DIR) UV_NATIVE_TLS=$(UV_NATIVE_TLS) TESTWEAVE_AI_RUNTIME__ENABLED=true uv run --project apps/server python3 -m testweave.cli runtime-worker --forever
 
 web:
-	NPM_CONFIG_CACHE=$(NPM_CONFIG_CACHE) npm run dev:web
+	NPM_CONFIG_CACHE=$(NPM_CONFIG_CACHE) WEB_PORT=$(WEB_PORT) SERVER_PORT=$(SERVER_PORT) npm run dev:web
 
 test-server:
 	cd apps/server && UV_CACHE_DIR=$(UV_CACHE_DIR) UV_NATIVE_TLS=$(UV_NATIVE_TLS) uv run pytest -m "not integration"

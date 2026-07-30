@@ -5,11 +5,12 @@ from testweave.modules.ai_capability.config import ExternalAgentFeatureConfig
 
 @dataclass(frozen=True)
 class ExternalAgentModule:
-    """不可变、无 I/O 的 External Agent 模块描述器。"""
+    """不可变、无 I/O 的 External Agent 模块描述器。
+
+    Gateway 路由挂载在主服务同进程同端口，模块描述器不持有监听地址信息。
+    """
 
     enabled: bool
-    bind_host: str
-    port: int
 
 
 def setup_external_agent_module(config: ExternalAgentFeatureConfig) -> ExternalAgentModule | None:
@@ -22,8 +23,4 @@ def setup_external_agent_module(config: ExternalAgentFeatureConfig) -> ExternalA
     if not config.enabled:
         return None
 
-    return ExternalAgentModule(
-        enabled=True,
-        bind_host=config.bind_host,
-        port=config.port,
-    )
+    return ExternalAgentModule(enabled=True)

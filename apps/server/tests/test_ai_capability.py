@@ -36,29 +36,20 @@ from testweave.modules.users.service import UserService
 def test_external_agent_config_defaults() -> None:
     config = ExternalAgentFeatureConfig()
     assert config.enabled is False
-    assert config.bind_host == "127.0.0.1"
-    assert config.port == 8787
+    assert config.token_prefix == "tw_ext_"
 
 
 def test_external_agent_config_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TESTWEAVE_EXTERNAL_AGENT__ENABLED", "true")
-    monkeypatch.setenv("TESTWEAVE_EXTERNAL_AGENT__BIND_HOST", "::1")
-    monkeypatch.setenv("TESTWEAVE_EXTERNAL_AGENT__PORT", "9090")
 
     config = ExternalAgentFeatureConfig()
     assert config.enabled is True
-    assert config.bind_host == "::1"
-    assert config.port == 9090
 
 
-def test_external_agent_config_invalid_host() -> None:
-    with pytest.raises(ValidationError) as exc_info_all:
-        ExternalAgentFeatureConfig(enabled=True, bind_host="0.0.0.0", port=8787)
-    assert "loopback" in str(exc_info_all.value)
-
-    with pytest.raises(ValidationError) as exc_info_v6:
-        ExternalAgentFeatureConfig(enabled=True, bind_host="::", port=8787)
-    assert "loopback" in str(exc_info_v6.value)
+def test_external_agent_config_has_no_bind_fields() -> None:
+    # Gateway 与主服务同进程同端口，不得再存在影子 bind_host / port 配置
+    assert "bind_host" not in ExternalAgentFeatureConfig.model_fields
+    assert "port" not in ExternalAgentFeatureConfig.model_fields
 
 
 def test_setup_external_agent_module_two_states() -> None:
@@ -68,12 +59,10 @@ def test_setup_external_agent_module_two_states() -> None:
     assert mod_disabled is None
 
     # 2. enabled=True -> ExternalAgentModule pure descriptor
-    config_enabled = ExternalAgentFeatureConfig(enabled=True, bind_host="127.0.0.1", port=8787)
+    config_enabled = ExternalAgentFeatureConfig(enabled=True)
     mod_enabled = setup_external_agent_module(config_enabled)
     assert isinstance(mod_enabled, ExternalAgentModule)
     assert mod_enabled.enabled is True
-    assert mod_enabled.bind_host == "127.0.0.1"
-    assert mod_enabled.port == 8787
 
 
 @pytest.mark.anyio

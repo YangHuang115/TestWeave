@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// 端口跟随环境变量 SERVER_PORT / WEB_PORT（缺省与 Makefile 一致）
+const serverPort = process.env.SERVER_PORT ?? 8000;
+const webPort = process.env.WEB_PORT ?? 5173;
+
 export default defineConfig({
   testDir: "./",
   testMatch: "**/*.spec.ts",
@@ -13,7 +17,7 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: `http://127.0.0.1:${webPort}`,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -27,13 +31,13 @@ export default defineConfig({
   webServer: [
     {
       command: "cd ../.. && make server",
-      url: "http://127.0.0.1:8000/health/ready",
+      url: `http://127.0.0.1:${serverPort}/health/ready`,
       reuseExistingServer: true,
       timeout: 60 * 1000,
     },
     {
       command: "cd ../.. && make web",
-      url: "http://127.0.0.1:5173",
+      url: `http://127.0.0.1:${webPort}`,
       reuseExistingServer: true,
       timeout: 60 * 1000,
     },

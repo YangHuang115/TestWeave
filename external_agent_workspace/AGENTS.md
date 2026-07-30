@@ -22,7 +22,7 @@
 
 ### 连接模式（仅用户明确选择时）
 
-1. 读取 `.env.local` 获取 `TESTWEAVE_AGENT_TOKEN` 和 `TESTWEAVE_GATEWAY_URL`（默认 `http://127.0.0.1:8787`）。
+1. 读取 `.env.local` 获取 `TESTWEAVE_AGENT_TOKEN` 和 `TESTWEAVE_GATEWAY_URL`（缺省值见 `.env.example`；Gateway 与 TestWeave 主服务同进程同端口）。修改 `TESTWEAVE_GATEWAY_URL` 后运行 `python run_agent.py --init` 同步 `.testweave/` 适配器配置。
 2. 调用 `GET /external/v1/tasks` 获取任务列表及关联需求全文。
 3. 基于需求内容生成产物，通过 `POST /external/v1/revision/candidates` 提交候选。
 4. 日常连接 Token 只需 `test_task.read` + `requirement.read` + `revision:candidate`；`workspace:spec` 仅在真实调用对应接口时需要；**不要**把 `skill:sync` 加入日常 Token。

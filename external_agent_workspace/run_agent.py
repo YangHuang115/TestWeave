@@ -20,6 +20,7 @@ TestWeave External Agent Client 独立运行脚本（本地优先、连接可选
     python run_agent.py --record-start --title "登录需求" --input spec.md
     python run_agent.py --mode connected "继续处理 TASK-000001 的测试点生成"
     python run_agent.py --mode share --sync-skills
+    python run_agent.py --init  # 按 TESTWEAVE_GATEWAY_URL 同步 .testweave 适配器配置
 """
 
 import argparse
@@ -62,6 +63,10 @@ REQUIRED_SKILL_FILES = (
 )
 
 DEFAULT_CAPABILITY = "ai-test-design"
+
+# Gateway 默认地址的唯一权威定义；实际地址以环境变量 / .env.local 中的
+# TESTWEAVE_GATEWAY_URL 为准，改地址后运行 `python run_agent.py --init` 同步适配器配置。
+DEFAULT_GATEWAY_URL = "http://127.0.0.1:8787"
 
 
 def load_env_file(filepath: Path) -> dict:
@@ -446,7 +451,7 @@ def load_workflow(capability_dir: Path) -> dict:
 class StandaloneExternalAgentClient:
     """独立轻量 Gateway HTTP 客户端 (无需安装 testweave 库)"""
 
-    def __init__(self, gateway_url: str = "http://127.0.0.1:8787", token: str = ""):
+    def __init__(self, gateway_url: str = DEFAULT_GATEWAY_URL, token: str = ""):
         self.gateway_url = gateway_url.rstrip("/")
         self.token = token
 
@@ -488,7 +493,7 @@ class StandaloneExternalAgentClient:
             raise RuntimeError(f"HTTP {err.code} ({code}): {msg}") from err
         except urllib.error.URLError as err:
             raise RuntimeError(
-                f"网络连接失败: {err.reason}\n提示: 宿主机 127.0.0.1:8787 端口可能未启动 Gateway 服务，或被本地沙箱拦截。"
+                f"网络连接失败: {err.reason}\n提示: Gateway 地址 {self.gateway_url}（默认 {DEFAULT_GATEWAY_URL}）可能未启动服务，或被本地沙箱拦截。"
             ) from err
 
     def check_session(self) -> dict:
@@ -858,6 +863,85 @@ def cmd_record_next(paths: WorkspacePaths, record_id: str) -> int:
     return 0
 
 
+def _sync_mcp_adapter(paths: WorkspacePaths, gateway_url: str) -> bool:
+    """同步 .testweave/adapters/mcp.json 的 url，保留既有 headers 等结构。"""
+    mcp_path = paths.workspace_dir / ".testweave" / "adapters" / "mcp.json"
+    if mcp_path.is_file():
+        old_text = mcp_path.read_text(encoding="utf-8")
+        config = json.loads(old_text)
+        original = json.loads(old_text)
+    else:
+        config = {}
+        original = None
+
+    servers = config.setdefault("mcpServers", {})
+    server = servers.setdefault("testweave", {})
+    server["url"] = f"{gateway_url}/mcp"
+    server.setdefault("headers", {"Authorization": "Bearer ${TESTWEAVE_AGENT_TOKEN}"})
+
+    if original == config:
+        print("✅ .testweave/adapters/mcp.json 已是最新")
+        return False
+    mcp_path.parent.mkdir(parents=True, exist_ok=True)
+    mcp_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"✅ 已更新 .testweave/adapters/mcp.json（url = {gateway_url}/mcp）")
+    return True
+
+
+def _sync_client_connection(paths: WorkspacePaths, gateway_url: str) -> bool:
+    """同步 .testweave/client/connection.yaml 的 base_url，保留 token_env、timeout_seconds 等既有字段。"""
+    conn_path = paths.workspace_dir / ".testweave" / "client" / "connection.yaml"
+    default_text = (
+        "connection:\n"
+        f"  base_url: {gateway_url}\n"
+        "  token_env: TESTWEAVE_AGENT_TOKEN\n"
+        "  timeout_seconds: 60\n"
+    )
+
+    old_text = conn_path.read_text(encoding="utf-8") if conn_path.is_file() else None
+    if old_text is None:
+        new_text = default_text
+    else:
+        lines = old_text.splitlines(keepends=True)
+        replaced = False
+        for index, line in enumerate(lines):
+            stripped = line.lstrip()
+            if stripped.startswith("base_url:"):
+                indent = line[: len(line) - len(stripped)]
+                ending = "\n" if line.endswith("\n") else ""
+                lines[index] = f"{indent}base_url: {gateway_url}{ending}"
+                replaced = True
+                break
+        if not replaced:
+            # 既有文件缺 base_url 时，在 connection: 块下补充，不改写其他字段
+            for index, line in enumerate(lines):
+                if line.strip() == "connection:":
+                    lines.insert(index + 1, f"  base_url: {gateway_url}\n")
+                    replaced = True
+                    break
+        new_text = "".join(lines) if replaced else default_text
+
+    if old_text == new_text:
+        print("✅ .testweave/client/connection.yaml 已是最新")
+        return False
+    conn_path.parent.mkdir(parents=True, exist_ok=True)
+    conn_path.write_text(new_text, encoding="utf-8")
+    print(f"✅ 已更新 .testweave/client/connection.yaml（base_url = {gateway_url}）")
+    return True
+
+
+def cmd_init(paths: WorkspacePaths) -> int:
+    """按 TESTWEAVE_GATEWAY_URL 生成/更新 .testweave 适配器与客户端连接配置（幂等可重跑）。"""
+    _token, gateway_url = load_token_and_gateway(paths.workspace_dir)
+    gateway_url = gateway_url.rstrip("/")
+    print(f"Gateway 地址: {gateway_url}（来源：环境变量 / .env.local 的 TESTWEAVE_GATEWAY_URL，缺省 {DEFAULT_GATEWAY_URL}）")
+    changed_mcp = _sync_mcp_adapter(paths, gateway_url)
+    changed_conn = _sync_client_connection(paths, gateway_url)
+    if not changed_mcp and not changed_conn:
+        print("所有适配器配置已是最新，未做任何修改。")
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # 模式解析与主入口
 # ---------------------------------------------------------------------------
@@ -905,6 +989,11 @@ def build_parser() -> argparse.ArgumentParser:
     local.add_argument("--record-reject", metavar="RECORD_ID", help="人工拒绝当前阶段")
     local.add_argument("--reason", default="", help="拒绝原因")
     local.add_argument("--record-next", metavar="RECORD_ID", help="查询下一步动作")
+    local.add_argument(
+        "--init",
+        action="store_true",
+        help="按 TESTWEAVE_GATEWAY_URL（缺省见 DEFAULT_GATEWAY_URL）生成/更新 .testweave 适配器配置，幂等可重跑",
+    )
 
     connected = parser.add_argument_group("connected 模式（显式连接 TestWeave）")
     connected.add_argument("--list-tasks", action="store_true", help="读取项目任务列表")
@@ -955,7 +1044,7 @@ def load_token_and_gateway(workspace_dir: Path) -> tuple[str, str]:
     gateway_url = (
         os.getenv("TESTWEAVE_GATEWAY_URL")
         or env_vars.get("TESTWEAVE_GATEWAY_URL")
-        or "http://127.0.0.1:8787"
+        or DEFAULT_GATEWAY_URL
     )
     return token, gateway_url
 
@@ -1141,6 +1230,11 @@ def run_share(args: argparse.Namespace, paths: WorkspacePaths, client: "Standalo
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     paths = WorkspacePaths(Path(args.workspace_dir))
+
+    # --init 只读 TESTWEAVE_GATEWAY_URL、不需要 Token、不发起 HTTP 请求
+    if args.init:
+        return cmd_init(paths)
+
     mode = resolve_mode(args)
 
     if mode == "local":
@@ -1152,7 +1246,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"⚠️ {mode} 模式需要有效的 TESTWEAVE_AGENT_TOKEN。")
         print("💡 请在 Web 界面获取 Access Token 后写入 external_agent_workspace/.env.local：")
         print("   TESTWEAVE_AGENT_TOKEN='tw_ext_xxxxxxxxxxxx'")
-        print("   TESTWEAVE_GATEWAY_URL='http://127.0.0.1:8787'")
+        print(f"   TESTWEAVE_GATEWAY_URL='{DEFAULT_GATEWAY_URL}'")
         if mode == "connected":
             print("   日常连接 Token 权限：test_task.read、requirement.read、revision:candidate。")
         else:

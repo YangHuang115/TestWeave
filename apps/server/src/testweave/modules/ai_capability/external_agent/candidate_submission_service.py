@@ -285,11 +285,15 @@ class CandidateSubmissionService:
         file_size: int,
         mime_type: str,
         checksum: str | None = None,
+        base_url: str = "",
     ) -> dict[str, Any]:
         # 校验 Scope
         ExternalAgentTokenService.verify_scope(effective_scopes, "revision:candidate")
 
         attachment_id = uuid.uuid4()
+        # uploadUrl 直接基于本次请求的 base_url 拼接：Gateway 与主服务同进程同端口，
+        # 外接 Agent 能请求到本接口即已知正确地址，无需任何端口配置。
+        upload_base = base_url.rstrip("/")
         return {
             "attachmentId": str(attachment_id),
             "submissionId": str(submission_id),
@@ -298,5 +302,5 @@ class CandidateSubmissionService:
             "fileSize": file_size,
             "mimeType": mime_type,
             "checksum": checksum,
-            "uploadUrl": f"http://127.0.0.1:8787/external/v1/attachments/upload/{attachment_id}",
+            "uploadUrl": f"{upload_base}/external/v1/attachments/upload/{attachment_id}",
         }

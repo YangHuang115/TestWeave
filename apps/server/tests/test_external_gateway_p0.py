@@ -1,37 +1,14 @@
 import uuid
 
 import pytest
-from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from testweave.core.errors import AppError
 from testweave.db.models import ProjectMember
 from testweave.main import create_app
-from testweave.modules.ai_capability.config import ExternalAgentFeatureConfig
 from testweave.modules.ai_capability.external_agent.token_service import (
     ExternalAgentTokenService,
 )
-
-
-def test_external_agent_config_loopback_validation() -> None:
-    # 允许回环
-    cfg1 = ExternalAgentFeatureConfig(bind_host="127.0.0.1")
-    assert cfg1.bind_host == "127.0.0.1"
-
-    cfg2 = ExternalAgentFeatureConfig(bind_host="localhost")
-    assert cfg2.bind_host == "localhost"
-
-    cfg3 = ExternalAgentFeatureConfig(bind_host="::1")
-    assert cfg3.bind_host == "::1"
-
-    # 拒绝公网绑定
-    with pytest.raises(ValidationError) as exc:
-        ExternalAgentFeatureConfig(bind_host="0.0.0.0")
-    assert "loopback" in str(exc.value)
-
-    with pytest.raises(ValidationError) as exc2:
-        ExternalAgentFeatureConfig(bind_host="192.168.1.100")
-    assert "loopback" in str(exc2.value)
 
 
 @pytest.fixture

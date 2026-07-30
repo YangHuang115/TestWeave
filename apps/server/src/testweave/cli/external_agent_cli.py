@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -13,9 +14,13 @@ TASK_ID_PATTERN = re.compile(
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 )
 
+# Gateway 默认地址（与 external_agent_workspace/run_agent.py 的 DEFAULT_GATEWAY_URL 保持一致）；
+# 可通过环境变量 TESTWEAVE_GATEWAY_URL 覆盖。
+DEFAULT_GATEWAY_URL = os.getenv("TESTWEAVE_GATEWAY_URL", "http://127.0.0.1:8787")
+
 
 class ExternalAgentCLIClient:
-    def __init__(self, gateway_url: str = "http://127.0.0.1:8787", token: str = ""):
+    def __init__(self, gateway_url: str = DEFAULT_GATEWAY_URL, token: str = ""):
         self.gateway_url = gateway_url.rstrip("/")
         self.token = token
         self.headers = {"Authorization": f"Bearer {token}"} if token else {}
